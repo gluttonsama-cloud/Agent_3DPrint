@@ -1,6 +1,6 @@
 import { Suspense, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Menu, CheckCircle, ZoomIn, ZoomOut, Grid, Rotate3D, Share2, Download, Edit2 } from 'lucide-react';
+import { ArrowLeft, Menu, CheckCircle, ZoomIn, ZoomOut, Grid, Rotate3D, ShoppingCart, Download, Edit2 } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useGLTF } from '@react-three/drei';
 
@@ -100,9 +100,12 @@ export default function Preview() {
             <Rotate3D className="w-5 h-5" />
             <span className="text-base font-bold tracking-wide">{autoRotate ? '停止旋转' : '旋转预览'}</span>
           </button>
-          <button className="neo-button bg-[var(--muted-beige)] h-14 flex items-center justify-center gap-2 text-[var(--charcoal)] hover:brightness-95 rounded-none">
-            <Share2 className="w-5 h-5" />
-            <span className="text-base font-bold tracking-wide">分享模型</span>
+          <button 
+            onClick={() => navigate('/order')}
+            className="neo-button bg-[var(--action-slate)] h-14 flex items-center justify-center gap-2 text-white hover:brightness-110 rounded-none"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            <span className="text-base font-bold tracking-wide">提交订单</span>
           </button>
         </div>
 
