@@ -102,7 +102,7 @@ export default function Preview() {
           </button>
           <button 
             onClick={() => navigate('/order')}
-            className="neo-button bg-[var(--action-slate)] h-14 flex items-center justify-center gap-2 text-white hover:brightness-110 rounded-none"
+            className="neo-button bg-[var(--muted-beige)] h-14 flex items-center justify-center gap-2 text-[var(--charcoal)] hover:brightness-95 rounded-none"
           >
             <ShoppingCart className="w-5 h-5" />
             <span className="text-base font-bold tracking-wide">提交订单</span>
