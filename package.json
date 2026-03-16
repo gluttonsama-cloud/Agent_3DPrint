@@ -1,0 +1,16 @@
+{
+  "name": "agent_3dprint",
+  "version": "1.0.0",
+  "main": "test-hunyuan3d-api.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.13.5",
+    "crypto-js": "^4.2.0"
+  }
+}

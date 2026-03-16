@@ -1,0 +1,5 @@
+{
+  "name": "3D 打印母端管理系统",
+  "description": "3D 打印子母端多 Agent 系统的母端（员工端）Web 后台管理系统，包含订单管理、设备管理、库存管理、数据看板，以及 Agent 可视化面板。",
+  "requestFramePermissions": []
+}

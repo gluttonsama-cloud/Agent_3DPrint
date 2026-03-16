@@ -1,0 +1,133 @@
+# ============================================
+# 3D 打印多 Agent 系统 - Docker Compose 配置
+# 版本：v2.0.0
+# ============================================
+
+version: '3.8'
+
+services:
+  # ============================================
+  # MongoDB 7.x - 主数据库
+  # ============================================
+  mongodb:
+    image: mongo:7
+    container_name: mongodb-3dprint
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-admin123}
+      - MONGO_INITDB_DATABASE=3dprint_db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - backend-network
+
+  # ============================================
+  # Redis 7.x - 缓存和队列
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: redis-3dprint
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - backend-network
+
+  # ============================================
+  # 后端 API 服务
+  # ============================================
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: backend-3dprint
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - MONGODB_URI=mongodb://admin:${MONGO_PASSWORD:-admin123}@mongodb:27017/3dprint_db?authSource=admin
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+      - JWT_EXPIRES_IN=7d
+      - QINIU_ACCESS_KEY=${QINIU_ACCESS_KEY}
+      - QINIU_SECRET_KEY=${QINIU_SECRET_KEY}
+      - QINIU_BUCKET=${QINIU_BUCKET:-3d-print-models}
+      - QINIU_DOMAIN=${QINIU_DOMAIN}
+      - HUNYUAN_SECRET_ID=${HUNYUAN_SECRET_ID}
+      - HUNYUAN_SECRET_KEY=${HUNYUAN_SECRET_KEY}
+      - LLM_PROVIDER=${LLM_PROVIDER:-qiniu}
+      - LLM_MODEL=${LLM_MODEL:-deepseek-r1-32b}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - backend-network
+      - frontend-network
+
+  # ============================================
+  # 管理端前端 (admin-web)
+  # ============================================
+  admin-web:
+    build:
+      context: .
+      dockerfile: admin-web/Dockerfile
+    container_name: admin-web-3dprint
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - frontend-network
+
+# ============================================
+# 数据卷
+# ============================================
+volumes:
+  mongo-data:
+    driver: local
+  redis-data:
+    driver: local
+
+# ============================================
+# 网络
+# ============================================
+networks:
+  backend-network:
+    driver: bridge
+  frontend-network:
+    driver: bridge

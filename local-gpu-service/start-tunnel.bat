@@ -1,0 +1,9 @@
+@echo off
+chcp 65001 >nul
+echo Starting Cloudflare Tunnel...
+echo.
+echo Connecting to Cloudflare...
+echo Wait for the URL to appear...
+echo.
+cloudflared tunnel --url http://localhost:7000
+pause

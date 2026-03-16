@@ -1,0 +1,193 @@
+# 3D Head Modeling API - .gitignore
+
+# =====================================================
+# 依赖目录
+# =====================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# =====================================================
+# 环境变量（包含敏感信息）
+# =====================================================
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+
+# =====================================================
+# 日志文件
+# =====================================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =====================================================
+# 上传文件（临时目录）
+# =====================================================
+uploads/*
+!uploads/.gitkeep
+
+# =====================================================
+# 测试覆盖率
+# =====================================================
+coverage/
+*.lcov
+.nyc_output/
+
+# =====================================================
+# 构建输出
+# =====================================================
+dist/
+build/
+*.tgz
+
+# =====================================================
+# 系统文件
+# =====================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =====================================================
+# IDE 和编辑器
+# =====================================================
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# =====================================================
+# 临时文件
+# =====================================================
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# =====================================================
+# 可选：操作系统特定
+# =====================================================
+# Windows
+$RECYCLE.BIN/
+System Volume Information/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+DocumentRevisions-V100/
+.fseventsd/
+.Spotlight-V100/
+.TemporaryItems/
+.Trashes/
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Linux
+*~
+
+# =====================================================
+# 可选：测试文件
+# =====================================================
+# 如果想忽略测试文件，取消注释
+# __tests__/**/__snapshots__
+# *.test.js
+# *.spec.js
+
+# =====================================================
+# 可选：文档
+# =====================================================
+# 如果不想提交设计文档，取消注释
+# *.md
+# !README.md
+
+# =====================================================
+# 安全提示
+# =====================================================
+# 永远不要提交以下内容：
+# - .env 文件（包含 API Keys、数据库密码等）
+# - node_modules/（通过 package.json 重新安装）
+# - 日志文件（可能包含敏感信息）
+# - 用户上传的文件（隐私问题）
+#
+# 应该提交的内容：
+# - 源代码（.js, .ts, .jsx, .tsx）
+# - 配置文件（package.json, .eslintrc, .prettierrc）
+# - 文档（README.md, AGENTS.md）
+# - 部署脚本和配置
+# =====================================================
+
+# =====================================================
+# 开发工具和临时文件
+# =====================================================
+.sisyphus/
+.ruff_cache/
+nul
+
+# Capacitor / Mobile 构建产物
+**/android/
+**/ios/
+capacitor.config.ts
+
+# 备份目录
+*-backup*/
+admin-web-backup-*/
+
+# 测试产物
+playwright-report/
+test-results/
+screenshots/
+*.test.png
+
+# AI 开发记录文件
+**/WAVE*.md
+**/QUICKSTART-WAVE*.md
+**/*-COMPLETE.md
+**/*_SUMMARY.md
+**/IMPLEMENTATION-SUMMARY.md
+**/MOCK-DEPLOYMENT-SUMMARY.md
+
+# 调试和测试报告
+DEBUG-REPORT-*.md
+*_TEST_REPORT.md
+PLAYWRIGHT_TEST_REPORT.md
+
+# API 测试（包含密钥）
+api_test/

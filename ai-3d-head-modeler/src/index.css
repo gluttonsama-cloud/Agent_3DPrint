@@ -1,0 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Noto+Serif+SC:wght@400;700&family=Space+Grotesk:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Noto Serif SC", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: "Space Grotesk", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+:root {
+  --warm-sand: #F5F5F0;
+  --deep-charcoal: #2D2D2D;
+  --slate-grey: #708090;
+  --muted-beige: #E2E2D5;
+  --white: #FFFFFF;
+  --bg-sand: #F5F5F0;
+  --action-slate: #708090;
+  --accent-beige: #E2E2D5;
+  --border-charcoal: #2D2D2D;
+  --surface-white: #FFFFFF;
+  --text-charcoal: #2D2D2D;
+  --slot-bg: #EAEAEA;
+  --charcoal: #2D2D2D;
+  --bg-color: var(--bg-sand);
+  --primary-action: var(--slate-grey);
+  --secondary-action: var(--muted-beige);
+  --border-color: var(--charcoal);
+  --shadow-offset: 3px;
+}
+
+body {
+  font-family: 'Noto Sans SC', sans-serif;
+  background-color: var(--warm-sand);
+  color: var(--deep-charcoal);
+}
+
+.neo-border {
+  border: 3px solid var(--deep-charcoal);
+}
+.neo-border-thin {
+  border: 2px solid var(--deep-charcoal);
+}
+.hard-shadow {
+  box-shadow: 5px 5px 0px 0px var(--deep-charcoal);
+}
+.hard-shadow-sm {
+  box-shadow: 3px 3px 0px 0px var(--deep-charcoal);
+}
+.hard-shadow-hover:active {
+  box-shadow: 2px 2px 0px 0px var(--deep-charcoal);
+  transform: translate(3px, 3px);
+}
+.marq-container {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.marq-content {
+  display: inline-block;
+  animation: marquee 15s linear infinite;
+}
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.neo-box {
+  border: 3px solid var(--border-charcoal);
+  box-shadow: 4px 4px 0px var(--border-charcoal);
+  transition: all 0.2s ease;
+}
+.neo-box:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px var(--border-charcoal);
+}
+.dashed-slot {
+  border: 2px dashed var(--border-charcoal);
+  background-color: var(--slot-bg);
+  color: var(--text-charcoal);
+}
+.neo-toggle-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 64px;
+  height: 36px;
+}
+.neo-toggle-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.neo-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--surface-white);
+  border: 3px solid var(--border-charcoal);
+  transition: .2s;
+}
+.neo-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 6px;
+  background-color: var(--border-charcoal);
+  transition: .2s;
+  box-shadow: 1px 1px 0px rgba(45, 45, 45, 0.2);
+}
+.neo-toggle-input:checked + .neo-toggle-slider {
+  background-color: var(--accent-beige);
+}
+.neo-toggle-input:checked + .neo-toggle-slider:before {
+  transform: translateX(28px);
+  background-color: var(--text-charcoal);
+  box-shadow: none;
+}
+
+.pattern-bg {
+  background-image: radial-gradient(var(--border-charcoal) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.08;
+}
+
+.serif-text {
+  font-family: 'Noto Serif SC', serif;
+}
+
+.neo-button {
+  border: 2px solid var(--border-color);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0px 0px var(--border-color);
+  font-weight: 700;
+  text-transform: uppercase;
+  transition: all 0.1s ease;
+}
+.neo-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0px 0px 0px 0px var(--border-color);
+}
+.neo-viewport {
+  background-color: #fff;
+  background-image: 
+      linear-gradient(var(--muted-beige) 1px, transparent 1px),
+      linear-gradient(90deg, var(--muted-beige) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background-color: #fff;
+  border: 2px solid var(--border-color);
+  font-weight: 600;
+  font-size: 0.8rem;
+  box-shadow: 2px 2px 0px 0px var(--border-color);
+}
+.shadow-custom {
+  box-shadow: 2px 2px 0px 0px var(--border-color);
+}

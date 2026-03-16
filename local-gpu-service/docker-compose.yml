@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  rembg-gpu:
+    build: .
+    container_name: rembg-background-removal
+    ports:
+      - "7000:7000"
+    volumes:
+      - ./images:/app/images
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

@@ -1,0 +1,5 @@
+{
+  "name": "AI 3D Head Modeler",
+  "description": "An app to create 3D head models from photos. Includes photo guide, upload, processing, and 3D preview screens.",
+  "requestFramePermissions": []
+}
