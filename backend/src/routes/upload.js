@@ -67,35 +67,20 @@ router.post('/', upload.array('photos', 5), async (req, res) => {
 
     console.log(`📤 收到上传请求：${files.length} 张照片，模式：${mode}`);
 
-    // 1. 上传到七牛云
-    const uploadPromises = files.map(async (file) => {
-      const objectKey = `photos/${Date.now()}-${uuidv4()}.jpg`;
-      
-      try {
-        const result = await qiniu.uploadFile(file.path, objectKey);
-        
-        // 删除临时文件
-        fs.unlinkSync(file.path);
-        
-        return result.url;
-      } catch (error) {
-        console.error('上传到七牛云失败:', error);
-        // 清理临时文件
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-        }
-        throw error;
-      }
+    const photoBase64List = files.map((file) => {
+      const fileBuffer = fs.readFileSync(file.path);
+      const base64 = fileBuffer.toString('base64');
+      fs.unlinkSync(file.path);
+      return base64;
     });
 
-    const photoUrls = await Promise.all(uploadPromises);
-    console.log(`✅ 照片上传到七牛云成功：${photoUrls.length} 张`);
+    console.log(`✅ 照片已转为 Base64：${photoBase64List.length} 张`);
 
-    // 2. 创建任务记录
     const taskId = `task-${Date.now()}-${uuidv4().substring(0, 8)}`;
     const task = taskStore.saveTask(taskId, {
       type: mode === 'multiview' ? 'hunyuan-multiview' : 'hunyuan-single',
-      photoUrls,
+      photoBase64List,
+      photoUrls: [],
       status: 'PENDING',
       progress: 0,
       mode,
@@ -115,15 +100,17 @@ router.post('/', upload.array('photos', 5), async (req, res) => {
         });
 
         // 使用混合调度器提交
-        const result = await hybridScheduler.submitTask(taskId, photoUrls, {
-          mode
+        const result = await hybridScheduler.submitTask(taskId, photoBase64List, {
+          mode,
+          useBase64: true
         });
 
         if (result.success) {
-          console.log(`✅ 混合调度器提交成功：${result.provider}`);
+          console.log(`✅ 混合调度器提交成功：${result.provider}, JobId: ${result.jobId}`);
           
           taskStore.updateTask(taskId, {
             progress: 20,
+            providerJobId: result.jobId,
             statusMessage: `${result.provider === 'hunyuan' ? '混元 3D' : 'Replicate'} 正在处理中...`
           });
         } else {
@@ -152,7 +139,7 @@ router.post('/', upload.array('photos', 5), async (req, res) => {
       taskId,
       status: 'PENDING',
       message: '照片上传成功，任务已创建',
-      photos: photoUrls,
+      photos: [],
       estimatedTime: mode === 'multiview' ? '4-6 分钟' : '3-5 分钟'
     });
 

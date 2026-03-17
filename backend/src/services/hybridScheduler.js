@@ -36,19 +36,17 @@ const ErrorCode = {
  * @param {Object} options - 选项
  * @returns {Promise<Object>} 提交结果
  */
-async function submitTask(taskId, imageUrls, options = {}) {
-  const { mode = 'single' } = options;
+async function submitTask(taskId, imageData, options = {}) {
+  const { mode = 'single', useBase64 = false } = options;
   
-  console.log(`🎯 混合调度器启动 - Task: ${taskId}, Mode: ${mode}`);
+  console.log(`🎯 混合调度器启动 - Task: ${taskId}, Mode: ${mode}, UseBase64: ${useBase64}`);
   
-  // 更新任务状态
   taskStore.updateTask(taskId, {
     schedulerStatus: 'SUBMITTING',
     schedulerMessage: '正在提交到混元 3D API...',
     attemptCount: 0
   });
 
-  // 尝试 1：混元 3D API
   try {
     console.log('📤 尝试 1：腾讯混元 3D API');
     
@@ -57,10 +55,11 @@ async function submitTask(taskId, imageUrls, options = {}) {
       attemptCount: 1
     });
 
-    const isMultiView = mode === 'multiview' && imageUrls.length >= 4;
+    const isMultiView = mode === 'multiview' && imageData.length >= 4;
     
-    const jobInfo = await hunyuanService.createTask(imageUrls, {
-      multiView: isMultiView
+    const jobInfo = await hunyuanService.createTask(imageData, {
+      multiView: isMultiView,
+      useBase64
     });
 
     console.log(`✅ 混元 3D 任务创建成功：${jobInfo.JobId}`);

@@ -1,40 +1,99 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { X, Sparkles, Clock } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { X, Sparkles, Clock, AlertCircle } from 'lucide-react';
+import { pollTaskStatus } from '../services/uploadService';
+
+interface ProcessingState {
+  taskId?: string;
+  estimatedTime?: string;
+  photoCount?: number;
+}
 
 export default function Processing() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as ProcessingState | undefined;
+  
   const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('正在提交任务...');
+  const [error, setError] = useState<string | null>(null);
+  const stopPollingRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => {
-    let startTime: number | null = null;
-    let animationFrameId: number;
+  const handleComplete = useCallback((modelUrls: string[]) => {
+    setProgress(100);
+    setStatusMessage('生成完成！');
+    
+    setTimeout(() => {
+      navigate('/preview', {
+        state: {
+          taskId: state?.taskId,
+          modelUrls,
+        },
+      });
+    }, 500);
+  }, [navigate, state?.taskId]);
 
-    const updateProgress = (currentTime: number) => {
-      if (startTime === null) startTime = currentTime;
-      const elapsed = currentTime - startTime;
-      const newProgress = Math.min((elapsed / 5000) * 100, 100);
-      
-      setProgress(newProgress);
+  const handleError = useCallback((errorMsg: string) => {
+    setError(errorMsg);
+    setStatusMessage('生成失败');
+  }, []);
 
-      if (newProgress < 100) {
-        animationFrameId = requestAnimationFrame(updateProgress);
-      }
-    };
-
-    animationFrameId = requestAnimationFrame(updateProgress);
-
-    return () => cancelAnimationFrame(animationFrameId);
+  const handleProgress = useCallback((newProgress: number, status: string, message?: string) => {
+    setProgress(newProgress);
+    if (message) {
+      setStatusMessage(message);
+    } else if (status === 'PENDING') {
+      setStatusMessage('正在提交任务...');
+    } else if (status === 'IN_PROGRESS') {
+      setStatusMessage('AI 建模中...');
+    }
   }, []);
 
   useEffect(() => {
-    if (progress >= 100) {
-      const timeout = setTimeout(() => {
-        navigate('/preview');
-      }, 200); // Short delay before navigation
-      return () => clearTimeout(timeout);
+    if (!state?.taskId) {
+      setError('缺少任务 ID');
+      return;
     }
-  }, [progress, navigate]);
+
+    stopPollingRef.current = pollTaskStatus(
+      state.taskId,
+      handleProgress,
+      handleComplete,
+      handleError,
+      3000
+    );
+
+    return () => {
+      if (stopPollingRef.current) {
+        stopPollingRef.current();
+      }
+    };
+  }, [state?.taskId, handleProgress, handleComplete, handleError]);
+
+  const handleCancel = () => {
+    if (stopPollingRef.current) {
+      stopPollingRef.current();
+    }
+    navigate('/');
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-[var(--bg-sand)]">
+        <div className="text-center space-y-4">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
+          <h1 className="text-2xl font-bold text-[var(--text-charcoal)]">生成失败</h1>
+          <p className="text-[var(--text-charcoal)]/70">{error}</p>
+          <button
+            onClick={() => navigate('/upload')}
+            className="mt-4 px-6 py-3 bg-[var(--action-slate)] text-white font-bold uppercase tracking-wider"
+          >
+            重新上传
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-between p-6 relative bg-[var(--bg-sand)]">
@@ -45,7 +104,7 @@ export default function Processing() {
           AI 3D Head
         </div>
         <button 
-          onClick={() => navigate('/')}
+          onClick={handleCancel}
           className="bg-[var(--text-charcoal)] border border-[var(--border-charcoal)] p-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,0.2)] hover:brightness-110 transition-colors text-[var(--bg-sand)]"
         >
           <X className="w-5 h-5" />
@@ -71,7 +130,7 @@ export default function Processing() {
         </div>
 
         <div className="text-center space-y-3">
-          <h1 className="text-3xl font-medium tracking-wide text-[var(--text-charcoal)] serif-text">正在生成</h1>
+          <h1 className="text-3xl font-medium tracking-wide text-[var(--text-charcoal)] serif-text">{statusMessage}</h1>
           <p className="text-sm font-normal text-[var(--text-charcoal)] opacity-70 tracking-widest uppercase">AI Processing</p>
         </div>
 
@@ -111,7 +170,7 @@ export default function Processing() {
       <footer className="w-full max-w-md mt-6 z-10 text-center pb-12">
         <div className="inline-flex items-center space-x-2 bg-[var(--accent-beige)] border border-[var(--border-charcoal)] px-4 py-2 text-xs font-medium shadow-[2px_2px_0px_0px_var(--border-charcoal)] text-[var(--text-charcoal)] uppercase tracking-wider">
           <Clock className="w-4 h-4" />
-          <span>预计剩余: {Math.ceil((100 - progress) / 20)}秒</span>
+          <span>预计剩余: {state?.estimatedTime || '3-5 分钟'}</span>
         </div>
       </footer>
     </div>

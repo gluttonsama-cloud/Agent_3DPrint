@@ -25,7 +25,7 @@ export default function Guide() {
             <span className="font-bold">头部建模</span>
           </h1>
           <p className="mt-2 text-[var(--slate-grey)] text-base font-normal tracking-wide max-w-[80%] leading-relaxed">
-            只需简单几步，即可生成高精度模型。请遵循以下禅意指南。
+            只需简单几步，即可生成高精度模型。请遵循以下指南。
           </p>
         </header>
 

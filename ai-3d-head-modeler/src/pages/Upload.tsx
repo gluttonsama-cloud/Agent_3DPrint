@@ -1,10 +1,14 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, X, Camera, CloudUpload } from 'lucide-react';
+import { ArrowLeft, X, Camera, CloudUpload, Loader2 } from 'lucide-react';
+import { uploadPhotos, PhotoFile } from '../services/uploadService';
 
 export default function Upload() {
   const navigate = useNavigate();
   const [photos, setPhotos] = useState<(string | null)[]>([null, null, null, null]);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [enableBackgroundRemoval, setEnableBackgroundRemoval] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeSlot, setActiveSlot] = useState<number | null>(null);
 
@@ -20,6 +24,7 @@ export default function Upload() {
     if (files && files.length > 0 && activeSlot !== null) {
       let currentSlot = activeSlot;
       const filesArray = Array.from(files);
+      const newPhotoFiles = [...photoFiles];
 
       filesArray.forEach((file) => {
         if (currentSlot < 4) {
@@ -33,11 +38,13 @@ export default function Upload() {
             });
           };
           reader.readAsDataURL(file);
+          newPhotoFiles[slotToFill] = file;
           currentSlot++;
         }
       });
+      
+      setPhotoFiles(newPhotoFiles);
     }
-    // Reset file input so the same file can be selected again if needed
     if (e.target) {
       e.target.value = '';
     }
@@ -53,6 +60,41 @@ export default function Upload() {
     const newPhotos = [...photos];
     newPhotos[index] = null;
     setPhotos(newPhotos);
+    
+    const newPhotoFiles = [...photoFiles];
+    newPhotoFiles[index] = undefined as unknown as File;
+    setPhotoFiles(newPhotoFiles);
+  };
+
+  const validPhotoCount = photos.filter(p => p !== null).length;
+  const canSubmit = validPhotoCount >= 1;
+
+  const handleUpload = async () => {
+    if (!canSubmit || isUploading) return;
+
+    setIsUploading(true);
+
+    const photoFilesToUpload: PhotoFile[] = photoFiles
+      .filter((f): f is File => f !== undefined && f !== null)
+      .map((file, index) => ({
+        file,
+        view: slots[index]?.label || `角度${index + 1}`,
+      }));
+
+    const result = await uploadPhotos(photoFilesToUpload, enableBackgroundRemoval, 'multiview');
+
+    if (result.success && result.taskId) {
+      navigate('/processing', {
+        state: {
+          taskId: result.taskId,
+          estimatedTime: result.estimatedTime,
+          photoCount: validPhotoCount,
+        },
+      });
+    } else {
+      alert(`上传失败：${result.error || '请重试'}`);
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -71,7 +113,7 @@ export default function Upload() {
       <main className="flex-1 flex flex-col px-6 pb-6 z-10 relative">
         <div className="mb-8 mt-2">
           <h2 className="text-3xl font-bold mb-4 leading-tight tracking-tight text-[var(--text-charcoal)]">创建您的<br />3D 数字分身</h2>
-          <p className="text-sm font-medium text-[var(--text-charcoal)]/80">请上传至少 3 张不同角度的照片 (正脸、侧脸、仰视)。</p>
+          <p className="text-sm font-medium text-[var(--text-charcoal)]/80">请上传至少 1 张照片，建议 3-4 张不同角度以获得最佳效果。</p>
         </div>
 
         <input 
@@ -124,29 +166,38 @@ export default function Upload() {
               <span className="text-xs font-medium text-[var(--text-charcoal)]/60 mt-1">自动去除杂乱背景</span>
             </div>
             <label className="neo-toggle-wrapper">
-              <input type="checkbox" className="neo-toggle-input" defaultChecked />
+              <input 
+                type="checkbox" 
+                className="neo-toggle-input" 
+                checked={enableBackgroundRemoval}
+                onChange={(e) => setEnableBackgroundRemoval(e.target.checked)}
+              />
               <span className="neo-toggle-slider"></span>
             </label>
           </div>
 
           <button 
-            onClick={() => {
-              // TODO: Replace with actual backend API call
-              // Example:
-              // const formData = new FormData();
-              // formData.append('front', frontPhotoFile);
-              // formData.append('side', sidePhotoFile);
-              // await fetch('https://your-backend-api.com/upload', { method: 'POST', body: formData });
-              navigate('/processing');
-            }}
-            className="w-full h-14 bg-[var(--action-slate)] text-white text-lg font-bold tracking-widest uppercase border-2 border-[var(--border-charcoal)] shadow-[4px_4px_0px_var(--border-charcoal)] flex items-center justify-center gap-3 active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all hover:bg-[#5f6f7f]"
+            onClick={handleUpload}
+            disabled={!canSubmit || isUploading}
+            className="w-full h-14 bg-[var(--action-slate)] text-white text-lg font-bold tracking-widest uppercase border-2 border-[var(--border-charcoal)] shadow-[4px_4px_0px_var(--border-charcoal)] flex items-center justify-center gap-3 active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all hover:bg-[#5f6f7f] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-x-0 disabled:active:translate-y-0 disabled:active:shadow-[4px_4px_0px_var(--border-charcoal)]"
           >
-            <CloudUpload className="w-6 h-6" />
-            开始上传生成
+            {isUploading ? (
+              <>
+                <Loader2 className="w-6 h-6 animate-spin" />
+                上传中...
+              </>
+            ) : (
+              <>
+                <CloudUpload className="w-6 h-6" />
+                开始上传生成
+              </>
+            )}
           </button>
           
           <div className="text-center mt-4">
-            <p className="text-[10px] font-bold text-[var(--text-charcoal)]/40 uppercase tracking-widest">预计消耗: 0.3 元 / 次</p>
+            <p className="text-[10px] font-bold text-[var(--text-charcoal)]/40 uppercase tracking-widest">
+              已选 {validPhotoCount} 张照片 | 预计消耗: 0.3 元 / 次
+            </p>
           </div>
         </div>
       </main>

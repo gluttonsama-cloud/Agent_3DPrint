@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, CloudUpload, CheckCircle } from 'lucide-react';
+import { ArrowLeft, CloudUpload, CheckCircle, Loader2 } from 'lucide-react';
 import ParameterSelector from '../components/ParameterSelector';
 import {
   MaterialType,
@@ -9,11 +9,17 @@ import {
   calculateTotalPrice,
   getDiscountText,
 } from '../utils/priceCalculator';
-import { createOrder, OrderParameters, PriceDetails } from '../services/orderService';
+
+interface OrderState {
+  taskId?: string;
+  modelUrl?: string;
+}
 
 export default function Order() {
   const navigate = useNavigate();
   const location = useLocation();
+  const state = location.state as OrderState | undefined;
+  
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const [material, setMaterial] = useState<MaterialType>('sla_standard');
@@ -28,29 +34,51 @@ export default function Order() {
     setIsSubmitting(true);
 
     try {
-      const parameters: OrderParameters = {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+      
+      const orderData = {
+        taskId: state?.taskId,
+        modelUrl: state?.modelUrl,
+        userId: `user_${Date.now()}`,
+        deviceType: 'sla',
         material,
         size,
         precision,
         quantity,
         enableBackgroundRemoval,
+        totalPrice: priceDetails.totalPrice,
+        specifications: {
+          material,
+          size,
+          precision,
+        },
       };
 
-      const result = await createOrder([], parameters, priceDetails);
+      const response = await fetch(`${API_BASE_URL}/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData),
+      });
 
-      if (result.success) {
-        navigate('/processing', { 
-          state: { 
-            orderId: result.orderId,
-            message: result.message 
-          } 
-        });
-      } else {
-        alert(`订单创建失败：${result.error}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}`);
       }
+
+      const result = await response.json();
+
+      navigate('/payment', {
+        state: {
+          success: true,
+          orderId: result.orderId || result.data?.orderId,
+          amount: priceDetails.totalPrice,
+        },
+      });
     } catch (error) {
       console.error('订单提交失败:', error);
-      alert('订单提交失败，请重试');
+      alert(`订单提交失败：${error instanceof Error ? error.message : '请重试'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -145,8 +173,17 @@ export default function Order() {
             disabled={isSubmitting}
             className="w-full h-14 bg-[var(--action-slate)] text-white text-lg font-bold tracking-widest uppercase border-2 border-[var(--border-charcoal)] shadow-[4px_4px_0px_var(--border-charcoal)] flex items-center justify-center gap-3 active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all hover:bg-[#5f6f7f] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-x-0 disabled:active:translate-y-0 disabled:active:shadow-[4px_4px_0px_var(--border-charcoal)]"
           >
-            <CloudUpload className="w-6 h-6" />
-            {isSubmitting ? '提交中...' : '确认提交订单'}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-6 h-6 animate-spin" />
+                提交中...
+              </>
+            ) : (
+              <>
+                <CloudUpload className="w-6 h-6" />
+                确认提交订单
+              </>
+            )}
           </button>
         </div>
       </main>

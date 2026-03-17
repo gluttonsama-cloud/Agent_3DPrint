@@ -104,7 +104,6 @@ router.get('/model/:taskId', async (req, res) => {
 
     console.log(`📥 代理下载请求：${taskId} (${format})`);
 
-    // 1. 获取任务
     const task = taskStore.getTask(taskId);
 
     if (!task) {
@@ -115,7 +114,6 @@ router.get('/model/:taskId', async (req, res) => {
       });
     }
 
-    // 2. 检查任务状态
     if (task.status !== 'SUCCEEDED') {
       return res.status(400).json({
         success: false,
@@ -124,8 +122,9 @@ router.get('/model/:taskId', async (req, res) => {
       });
     }
 
-    // 3. 获取模型 URL
-    if (!task.result || !task.result.modelUrls) {
+    const modelUrls = task.modelUrls || task.result?.modelUrls || [];
+
+    if (!modelUrls || modelUrls.length === 0) {
       return res.status(500).json({
         success: false,
         error: 'MODEL_NOT_FOUND',
@@ -133,18 +132,16 @@ router.get('/model/:taskId', async (req, res) => {
       });
     }
 
-    const modelUrl = task.result.modelUrls[format];
-
-    if (!modelUrl) {
-      return res.status(400).json({
-        success: false,
-        error: 'INVALID_FORMAT',
-        message: `不支持的格式：${format}`
-      });
+    let modelUrl = modelUrls.find(url => url.includes('.glb'));
+    if (format === 'zip') {
+      modelUrl = modelUrls.find(url => url.includes('.zip')) || modelUrls[0];
     }
 
-    // 4. 代理下载（流式传输）
-    console.log(`⬇️  开始从源 URL 下载：${modelUrl}`);
+    if (!modelUrl) {
+      modelUrl = modelUrls[0];
+    }
+
+    console.log(`⬇️  开始从源 URL 下载：${modelUrl.substring(0, 80)}...`);
 
     const response = await axios.get(modelUrl, {
       responseType: 'stream',

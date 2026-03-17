@@ -28,6 +28,28 @@ app.get('/health', (req, res) => {
   });
 });
 
+const taskStore = require('./services/taskStore');
+app.get('/api/debug/tasks', (req, res) => {
+  const tasks = taskStore.getAllTasks();
+  res.json({
+    count: tasks.length,
+    tasks: tasks.map(t => ({
+      id: t.id,
+      status: t.status,
+      progress: t.progress,
+      provider: t.provider,
+      providerJobId: t.providerJobId,
+      photoUrls: t.photoUrls,
+      statusMessage: t.statusMessage,
+      schedulerStatus: t.schedulerStatus,
+      schedulerMessage: t.schedulerMessage,
+      hunyuanError: t.hunyuanError,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt
+    }))
+  });
+});
+
 // API 路由
 const uploadRoutes = require('./routes/upload');
 const statusRoutes = require('./routes/status');

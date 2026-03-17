@@ -1,10 +1,26 @@
 import { Suspense, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Menu, CheckCircle, ZoomIn, ZoomOut, Grid, Rotate3D, ShoppingCart, Download, Edit2 } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useGLTF } from '@react-three/drei';
 
-const LOCAL_MODEL_PATH = '/model.glb';
+const DEFAULT_MODEL_PATH = '/model.glb';
+
+// TEMP: 使用后端代理解决 CORS 问题
+// 生产环境应绑定七牛云公网域名，直接使用 modelUrls
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+
+interface PreviewState {
+  taskId?: string;
+  modelUrls?: string[];
+}
+
+function getProxiedModelUrl(taskId: string | undefined, originalUrl: string | undefined): string {
+  if (!taskId || !originalUrl) {
+    return DEFAULT_MODEL_PATH;
+  }
+  return `${API_BASE_URL}/download/model/${taskId}?format=glb`;
+}
 
 function HeadModel({ url }: { url: string }) {
   const { scene } = useGLTF(url) as any;
@@ -13,7 +29,15 @@ function HeadModel({ url }: { url: string }) {
 
 export default function Preview() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as PreviewState | undefined;
+  
   const [autoRotate, setAutoRotate] = useState(true);
+  
+  const taskId = state?.taskId;
+  const originalModelUrl = state?.modelUrls?.[0];
+  const modelUrl = getProxiedModelUrl(taskId, originalModelUrl);
+  const downloadUrl = taskId ? `${API_BASE_URL}/download/model/${taskId}?format=glb` : DEFAULT_MODEL_PATH;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-sand)]">
@@ -69,7 +93,7 @@ export default function Preview() {
                   <meshBasicMaterial color="#708090" />
                 </mesh>
               }>
-                <HeadModel url={LOCAL_MODEL_PATH} />
+                <HeadModel url={modelUrl} />
               </Suspense>
             </Canvas>
           </div>
@@ -101,7 +125,7 @@ export default function Preview() {
             <span className="text-base font-bold tracking-wide">{autoRotate ? '停止旋转' : '旋转预览'}</span>
           </button>
           <button 
-            onClick={() => navigate('/order')}
+            onClick={() => navigate('/order', { state: { taskId, modelUrl } })}
             className="neo-button bg-[var(--muted-beige)] h-14 flex items-center justify-center gap-2 text-[var(--charcoal)] hover:brightness-95 rounded-none"
           >
             <ShoppingCart className="w-5 h-5" />
@@ -110,8 +134,8 @@ export default function Preview() {
         </div>
 
         <a 
-          href={LOCAL_MODEL_PATH}
-          download="head_model.glb"
+          href={downloadUrl}
+          download={`model_${taskId || 'download'}.glb`}
           className="w-full neo-button bg-[var(--slate-grey)] text-white h-16 flex items-center justify-between px-6 hover:brightness-110 rounded-none border-[var(--charcoal)] group"
         >
           <div className="flex items-center gap-3">
