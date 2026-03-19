@@ -163,4 +163,93 @@ router.post('/', upload.array('photos', 5), async (req, res) => {
   }
 });
 
+/**
+ * POST /api/upload/base64
+ * 使用 Base64 上传照片（用于 APP 原生 HTTP）
+ */
+router.post('/base64', express.json({ limit: '50mb' }), async (req, res) => {
+  try {
+    const { photos = [], mode = 'single', enableBackgroundRemoval = false } = req.body;
+
+    if (!photos || photos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: '至少需要上传 1 张照片'
+      });
+    }
+
+    console.log(`📤 收到 Base64 上传请求：${photos.length} 张照片，模式：${mode}`);
+
+    const taskId = `task-${Date.now()}-${uuidv4().substring(0, 8)}`;
+    taskStore.saveTask(taskId, {
+      type: mode === 'multiview' ? 'hunyuan-multiview' : 'hunyuan-single',
+      photoBase64List: photos,
+      photoUrls: [],
+      status: 'PENDING',
+      progress: 0,
+      mode,
+      enableBackgroundRemoval
+    });
+
+    console.log(`💾 任务已保存：${taskId}`);
+
+    // 异步提交到混合调度器
+    setImmediate(async () => {
+      try {
+        taskStore.updateTask(taskId, {
+          status: 'IN_PROGRESS',
+          progress: 10,
+          statusMessage: '正在提交到 3D 生成服务...'
+        });
+
+        const result = await hybridScheduler.submitTask(taskId, photos, {
+          mode,
+          useBase64: true
+        });
+
+        if (result.success) {
+          console.log(`✅ 混合调度器提交成功：${result.provider}, JobId: ${result.jobId}`);
+          taskStore.updateTask(taskId, {
+            progress: 20,
+            providerJobId: result.jobId,
+            statusMessage: `${result.provider === 'hunyuan' ? '混元 3D' : 'Replicate'} 正在处理中...`
+          });
+        } else {
+          console.error('❌ 混合调度器提交失败:', result.error);
+          taskStore.updateTask(taskId, {
+            status: 'FAILED',
+            error: result.error,
+            errorCode: result.errorCode || 'SUBMIT_ERROR'
+          });
+        }
+      } catch (error) {
+        console.error('混合调度器错误:', error);
+        taskStore.updateTask(taskId, {
+          status: 'FAILED',
+          error: `提交失败：${error.message}`,
+          errorCode: 'SCHEDULER_ERROR'
+        });
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      taskId,
+      status: 'PENDING',
+      message: '照片上传成功，任务已创建',
+      photos: [],
+      estimatedTime: mode === 'multiview' ? '4-6 分钟' : '3-5 分钟'
+    });
+
+  } catch (error) {
+    console.error('Base64 上传 API 错误:', error);
+    res.status(500).json({
+      success: false,
+      error: 'UPLOAD_ERROR',
+      message: error.message || '上传失败，请稍后重试'
+    });
+  }
+});
+
 module.exports = router;

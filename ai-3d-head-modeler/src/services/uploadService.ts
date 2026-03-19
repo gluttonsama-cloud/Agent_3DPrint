@@ -3,6 +3,8 @@
  * 处理照片上传和任务状态查询
  */
 
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+
 // API 基础 URL（从环境变量读取）
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
@@ -11,7 +13,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
  */
 export interface PhotoFile {
   file: File;
-  view: string; // 视角：主视角/侧面照/仰视照/其他角度
+  view: string;
 }
 
 /**
@@ -44,11 +46,150 @@ export interface TaskStatusResponse {
 }
 
 /**
+ * File 转 Base64
+ */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * 压缩图片到指定大小
+ * @param file 原始图片文件
+ * @param maxSizeKB 目标最大大小（KB）
+ * @returns 压缩后的 Base64 字符串
+ */
+async function compressImage(file: File, maxSizeKB: number = 3000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      // 计算压缩比例
+      let width = img.width;
+      let height = img.height;
+      
+      // 最大尺寸 2048x2048
+      const maxDimension = 2048;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+      
+      // 创建 canvas 压缩
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('无法创建 canvas 上下文'));
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // 逐步降低质量直到满足大小限制
+      let quality = 0.8;
+      const tryCompress = () => {
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const base64 = dataUrl.split(',')[1];
+        const sizeKB = Math.round(base64.length * 0.75 / 1024); // Base64 约 1.33x 原始大小
+        
+        console.log(`📐 压缩尝试: 质量=${quality.toFixed(2)}, 大小=${sizeKB}KB`);
+        
+        if (sizeKB <= maxSizeKB || quality <= 0.1) {
+          console.log(`✅ 压缩完成: ${sizeKB}KB (原: ${Math.round(file.size / 1024)}KB)`);
+          resolve(base64);
+        } else {
+          quality -= 0.1;
+          tryCompress();
+        }
+      };
+      
+      tryCompress();
+    };
+    
+    img.onerror = () => reject(new Error('图片加载失败'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+/**
+ * 使用 Capacitor 原生 HTTP 发送请求
+ */
+async function nativeHttpRequest(
+  url: string,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  data?: any,
+  headers?: Record<string, string>
+): Promise<{ status: number; data: any }> {
+  const platform = Capacitor.getPlatform();
+  console.log('📱 当前平台:', platform, ', 原生模式:', Capacitor.isNativePlatform());
+  console.log('📤 请求 URL:', url);
+  console.log('📤 请求方法:', method);
+  console.log('📤 请求数据大小:', data ? JSON.stringify(data).length : 0, 'bytes');
+  
+  if (Capacitor.isNativePlatform()) {
+    console.log('🔌 使用 CapacitorHttp 原生请求');
+    
+    try {
+      const requestOptions = {
+        url,
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        },
+        data: data || {}
+      };
+      console.log('📤 请求配置:', JSON.stringify({
+        url: requestOptions.url,
+        method: requestOptions.method,
+        headers: requestOptions.headers,
+        dataLength: JSON.stringify(requestOptions.data).length
+      }));
+      
+      const result = await CapacitorHttp.request(requestOptions);
+      
+      console.log('📥 原生响应状态:', result.status);
+      console.log('📥 原生响应数据:', typeof result.data === 'string' ? result.data.substring(0, 200) : result.data);
+      return { status: result.status, data: result.data };
+    } catch (error: any) {
+      console.error('❌ 原生请求失败:', error);
+      console.error('❌ 错误类型:', typeof error);
+      console.error('❌ 错误详情:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+      throw new Error(error.message || JSON.stringify(error) || '原生请求失败');
+    }
+  } else {
+    console.log('🌐 使用标准 fetch');
+    
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      },
+      body: data ? JSON.stringify(data) : undefined
+    });
+    
+    const responseData = await response.json();
+    return { status: response.status, data: responseData };
+  }
+}
+
+/**
  * 上传照片并创建 3D 任务
- * @param photos 照片文件列表
- * @param enableBackgroundRemoval 是否开启背景抠图
- * @param mode 上传模式（single/multiview）
- * @returns 上传结果
  */
 export async function uploadPhotos(
   photos: PhotoFile[],
@@ -56,42 +197,90 @@ export async function uploadPhotos(
   mode: string = 'multiview'
 ): Promise<UploadResponse> {
   try {
-    const formData = new FormData();
-    
-    // 添加照片文件
-    photos.forEach((photo) => {
-      formData.append('photos', photo.file);
-    });
-    
-    // 添加参数
-    formData.append('mode', mode);
-    formData.append('enableBackgroundRemoval', enableBackgroundRemoval.toString());
-
-    const response = await fetch(`${API_BASE_URL}/upload`, {
-      method: 'POST',
-      body: formData,
+    console.log('📤 开始上传...', {
+      photoCount: photos.length,
+      apiUrl: API_BASE_URL,
+      mode,
+      enableBackgroundRemoval,
+      platform: Capacitor.getPlatform()
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+    const base64Photos = await Promise.all(
+      photos.map(async (photo, index) => {
+        console.log(`照片 ${index}:`, {
+          name: photo.file.name,
+          size: photo.file.size,
+          type: photo.file.type
+        });
+        // 压缩图片到 3MB 以内（混元 API 限制 10MB，留出余量）
+        const compressed = await compressImage(photo.file, 3000);
+        console.log(`照片 ${index} 压缩后大小: ${Math.round(compressed.length * 0.75 / 1024)}KB`);
+        return compressed;
+      })
+    );
+
+    console.log('📷 Base64 转换完成，总大小约:', Math.round(base64Photos.reduce((a, b) => a + b.length, 0) / 1024), 'KB');
+
+    const url = `${API_BASE_URL}/upload/base64`;
+    console.log('🌐 发起请求:', url);
+
+    const startTime = Date.now();
+    
+    const { status, data: result } = await nativeHttpRequest(
+      url,
+      'POST',
+      {
+        photos: base64Photos,
+        mode,
+        enableBackgroundRemoval
+      },
+      { 'Content-Type': 'application/json' }
+    );
+
+    const elapsed = Date.now() - startTime;
+    console.log('⏱️ 请求耗时:', elapsed, 'ms');
+    console.log('📥 响应状态:', status);
+    console.log('📥 响应数据:', result);
+
+    if (status >= 200 && status < 300 && result.success) {
+      console.log('✅ 上传成功:', result);
+      return {
+        success: true,
+        taskId: result.taskId,
+        status: result.status,
+        message: result.message || '照片上传成功',
+        photos: result.photos,
+        estimatedTime: result.estimatedTime,
+      };
+    } else {
+      console.error('❌ 上传失败:', status, result);
+      return {
+        success: false,
+        error: result?.message || result?.error || `HTTP ${status}`,
+      };
     }
-
-    const result = await response.json();
-    
-    return {
-      success: true,
-      taskId: result.taskId,
-      status: result.status,
-      message: result.message || '照片上传成功',
-      photos: result.photos,
-      estimatedTime: result.estimatedTime,
-    };
   } catch (error) {
     console.error('上传照片失败:', error);
+    
+    let errorDetail = '上传失败';
+    if (error instanceof TypeError) {
+      errorDetail = `网络请求被阻止: ${error.message}`;
+    } else if (error instanceof Error) {
+      errorDetail = error.message;
+    }
+    
+    const diagInfo = {
+      platform: Capacitor.getPlatform(),
+      isNative: Capacitor.isNativePlatform(),
+      url: API_BASE_URL,
+      onLine: navigator.onLine,
+      timestamp: new Date().toISOString()
+    };
+    console.log('📋 诊断信息:', diagInfo);
+    
     return {
       success: false,
-      error: error instanceof Error ? error.message : '上传失败，请重试',
+      error: `${errorDetail} [平台:${diagInfo.platform}, 原生:${diagInfo.isNative}]`,
     };
   }
 }

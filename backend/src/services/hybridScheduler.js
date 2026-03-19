@@ -55,7 +55,7 @@ async function submitTask(taskId, imageData, options = {}) {
       attemptCount: 1
     });
 
-    const isMultiView = mode === 'multiview' && imageData.length >= 4;
+    const isMultiView = mode === 'multiview' && imageData.length >= 2;
     
     const jobInfo = await hunyuanService.createTask(imageData, {
       multiView: isMultiView,
