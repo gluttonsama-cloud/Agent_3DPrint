@@ -44,7 +44,7 @@ const AgentVisualization: React.FC = () => {
     if (useRealData) {
       fetchDecisions();
       
-      const newSocket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001', {
+      const newSocket = io(import.meta.env.VITE_SOCKET_SERVER || 'http://localhost:3000', {
         path: '/socket.io',
         transports: ['websocket'],
       });
