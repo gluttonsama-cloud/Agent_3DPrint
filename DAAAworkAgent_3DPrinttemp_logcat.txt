@@ -1,0 +1,202 @@
+--------- beginning of main
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.457  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.458  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.459  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.459  2228  4005 I MiSensorServiceImpl: user found in check list, getPackageName  android.view.OrientationEventListener
+03-23 19:37:43.615  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:43.615  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5375.1,R:2512.6,G:2166.2,B:1092.4, lux: 89.2, clone:34975
+03-23 19:37:43.753  9942 10296 D TrafficStats: tagSocket(134) with statsTag=0x6900, statsUid=-1
+03-23 19:37:43.754  9942 10224 D TrafficStats: tagSocket(118) with statsTag=0xffffffff, statsUid=-1
+03-23 19:37:43.814  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:43.815  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5315.3,R:2480.8,G:2133.5,B:1081.5, lux: 87.9, clone:34975
+03-23 19:37:43.817  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:43.817  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5304.5,R:2477.3,G:2132.0,B:1085.1, lux: 87.6, clone:34975
+03-23 19:37:43.817  2228  4022 W ActivityManagerServiceImpl: Sending non-protected broadcast miui.intent.action.CYCLE_CHECK from system uid 1000 pkg android. Callers=com.android.server.am.ActivityManagerService.checkBroadcastFromSystem:15121 com.android.server.am.ActivityManagerService.broadcastIntentLockedTraced:15951 com.android.server.am.ActivityManagerService.broadcastIntentLocked:15179 com.android.server.am.ActivityManagerService.broadcastIntentInPackage:16184 com.android.server.am.ActivityManagerService$LocalService.broadcastIntentInPackage:18930 
+--------- beginning of system
+03-23 19:37:43.817  2228  4022 D AlarmManager: mBroadcastRefCount -> 1
+03-23 19:37:43.817  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:43.818  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5335.3,R:2488.2,G:2145.8,B:1086.4, lux: 88.4, clone:34975
+03-23 19:37:43.833  2228  2253 I UsageStatsService: Event is not in quota! android.app.usage.UsageEvents$Event@5e330c8
+03-23 19:37:43.837  2228  2253 I UsageStatsService: Event is not in quota! android.app.usage.UsageEvents$Event@d48e561
+03-23 19:37:43.837  2228  2253 I UsageStatsService: Event is not in quota! android.app.usage.UsageEvents$Event@7f36886
+03-23 19:37:43.841  1690  1690 I vendor.xiaomi.hardware.micharge-service: ReadFilePathValue path = /sys/class/power_supply/battery/temp value = 357
+03-23 19:37:43.842  2228  2251 E IMiCharge: MiCharge method 9 val = 357
+03-23 19:37:43.842  2228  2228 D AlarmManager: mBroadcastRefCount -> 0
+03-23 19:37:43.842  2228  2228 D AlarmManager: mPendingIntent -> PendingIntent{6dba22c: PendingIntentRecord{f5a4f5 android broadcastIntent}}
+03-23 19:37:43.843  1690  1690 I vendor.xiaomi.hardware.micharge-service: ReadFilePathValue path = /sys/class/power_supply/battery/charge_control_limit value = 5
+03-23 19:37:43.843  2228  2251 E IMiCharge: MiCharge method 10 val = 5
+03-23 19:37:43.870  1601  2365 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 0
+03-23 19:37:43.871  2956  4287 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+03-23 19:37:43.871  2956  4287 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:10 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:18 fd_meta:19 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0
+03-23 19:37:43.910  2956  3035 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+03-23 19:37:43.913  2956  4288 D libsensor-parseRGB: the value of RGB [36778.151885 37070.822455 34975.079697 38130.461182 38474.963924 36263.599543 38104.543597 38418.533703 36230.025752 36379.220023 36688.295969 34604.709814]
+03-23 19:37:43.958  2228 10840 D WifiNl80211Manager: Scan result ready event
+03-23 19:37:43.958  2228 10840 D WifiNative: Scan result ready event
+03-23 19:37:43.960  2867 26050 I LOWI-9.0.1.68: [LOWI-Scan] lowi_close_record:Scan done in 611057470ms, 46 APs in scan results
+03-23 19:37:43.962  2228  4337 W IE_Capabilities: Unknown RSN cipher suite: 6ac0f00
+03-23 19:37:43.962  2867  3001 I LOWI-9.0.1.68: [LOWIUtils] responseToOutPostcard - TO: FreeWifiScanObserver, FROM:   LOWI-SERVER, RESP:  LOWI_ASYNC_DISCOVERY_SCAN_RESULTS
+03-23 19:37:43.965  2228  4337 W IE_Capabilities: Unknown RSN cipher suite: 6ac0f00
+03-23 19:37:43.966  2228  4337 D WificondScannerImpl: Filtering out 20 scan results.
+03-23 19:37:43.972  1551  2327 I LocSvc_api_v02: ---> locClientSendReq line 2462 QMI_LOC_INJECT_WIFI_AP_DATA_REQ_V02
+03-23 19:37:43.975  1551  3692 I LocSvc_ApiV02: <--- globalRespCb line 270 QMI_LOC_INJECT_WIFI_AP_DATA_REQ_V02
+03-23 19:37:43.980  2228  4212 D WakeupController: Attempted to handleScanResults while not enabled
+03-23 19:37:43.980  2228  4813 E AppScanObserverService: Result available, null observers for user: 0
+03-23 19:37:44.017  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:44.017  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5370.7,R:2500.9,G:2153.7,B:1092.4, lux: 88.8, clone:34975
+03-23 19:37:44.030  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4213 went down
+03-23 19:37:44.030  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4213 went down
+03-23 19:37:44.032  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4214 went down
+03-23 19:37:44.032  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4214 went down
+03-23 19:37:44.033  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4215 went down
+03-23 19:37:44.034  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4215 went down
+03-23 19:37:44.035  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4217 went down
+03-23 19:37:44.036  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4217 went down
+03-23 19:37:44.480 10072 10072 I WifiMonitor: receive Broadcast SCAN_RESULTS_AVAILABLE_ACTION,updated:true
+03-23 19:37:44.481  2228  2275 W BroadcastQueue: Greezer Denial: sending Intent { act=android.net.wifi.SCAN_RESULTS flg=0x4000010 (has extras) }, action: android.net.wifi.SCAN_RESULTS from android (uid=1000) due to receiver ProcessRecord{fde2f 28263:com.tencent.mm/u0a316} (uid 10316) need cached broadcast
+03-23 19:37:44.481  2228  2275 W BroadcastQueue: Greezer Denial: sending Intent { act=android.net.wifi.SCAN_RESULTS flg=0x4000010 (has extras) }, action: android.net.wifi.SCAN_RESULTS from android (uid=1000) due to receiver ProcessRecord{bb09ec9 12499:com.tencent.mm:push/u0a316} (uid 10316) need cached broadcast
+03-23 19:37:44.486  2228  2275 I SmartPower: com.tencent.wework/10395(9878): idle->background(3978ms) R(broadcast start Intent { act=android.net.wifi.SCAN_RESULTS flg=0x4000010 (has extras) }) adj=905.
+03-23 19:37:44.487  2228  2275 I SmartPower: com.tencent.wework:wxa_container0/10395(23067): idle->background(3980ms) R(broadcast start Intent { act=android.net.wifi.SCAN_RESULTS flg=0x4000010 (has extras) }) adj=910.
+03-23 19:37:44.487 13861 13861 I AIRC_【GEEK】GeekSceneFuncImpl: sceneFunctionStatus needStartSceneFunc=true
+03-23 19:37:44.489 13861 22648 I AIRC_CounterTrack: collect: signal-WifiScanPerception
+03-23 19:37:44.489 13861 22648 I MMKV    : <MMKV.cpp:1170::sync> MMKV::sync, SyncFlag = 1
+03-23 19:37:44.490  2228 10840 W WifiService: Permission violation - getScanResults not allowed for uid=10124, packageName=com.xiaomi.aicr, reason=java.lang.SecurityException: UID 10124 has no location permission
+03-23 19:37:44.616  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:44.616  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5337.5,R:2482.8,G:2138.9,B:1088.0, lux: 88.1, clone:34975
+03-23 19:37:44.814  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:44.814  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5295.4,R:2466.8,G:2121.5,B:1079.9, lux: 87.3, clone:34975
+03-23 19:37:44.815  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:44.816  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5302.0,R:2466.1,G:2120.3,B:1079.1, lux: 87.4, clone:34975
+03-23 19:37:45.013  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:45.014  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5235.6,R:2437.0,G:2098.8,B:1061.0, lux: 86.6, clone:34975
+03-23 19:37:45.131  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4218 went down
+03-23 19:37:45.131  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4218 went down
+03-23 19:37:45.133  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4219 went down
+03-23 19:37:45.133  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4219 went down
+03-23 19:37:45.135  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 421a went down
+03-23 19:37:45.135  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 421a went down
+03-23 19:37:45.136  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 421b went down
+03-23 19:37:45.137  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 421b went down
+03-23 19:37:45.215  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:45.215  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5118.1,R:2393.7,G:2054.2,B:1046.0, lux: 84.4, clone:34975
+03-23 19:37:45.414  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:45.414  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5071.6,R:2360.5,G:2023.9,B:1027.6, lux: 83.4, clone:34975
+03-23 19:37:45.615  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:45.615  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5135.8,R:2389.4,G:2055.0,B:1043.9, lux: 84.6, clone:34975
+03-23 19:37:45.802 12983 14352 D TrafficStats: tagSocket(205) with statsTag=0x4000401, statsUid=10122
+03-23 19:37:45.813  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:45.814  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5051.6,R:2365.3,G:2029.5,B:1029.4, lux: 83.4, clone:34975
+03-23 19:37:45.814  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:45.815  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4984.1,R:2333.4,G:1992.0,B:1018.3, lux: 81.8, clone:34975
+03-23 19:37:46.014  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.014  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4987.4,R:2325.5,G:1992.2,B:1013.6, lux: 82.0, clone:34975
+03-23 19:37:46.015  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.015  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4954.2,R:2308.8,G:1983.8,B:1010.8, lux: 81.5, clone:34975
+03-23 19:37:46.016  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.016  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4938.6,R:2302.3,G:1972.4,B:1003.5, lux: 81.1, clone:34975
+03-23 19:37:46.017  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.017  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4947.5,R:2302.1,G:1975.2,B:1005.6, lux: 81.3, clone:34975
+03-23 19:37:46.018  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.018  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4909.8,R:2291.9,G:1962.2,B:998.3, lux: 80.7, clone:34975
+03-23 19:37:46.019  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.019  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4843.4,R:2262.7,G:1936.7,B:985.9, lux: 79.5, clone:34975
+03-23 19:37:46.056 12983 14352 D TrafficStats: tagSocket(209) with statsTag=0x4000401, statsUid=10122
+03-23 19:37:46.214  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.214  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4732.6,R:2202.7,G:1892.8,B:967.3, lux: 77.6, clone:34975
+03-23 19:37:46.230  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 421c went down
+03-23 19:37:46.230  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 421c went down
+03-23 19:37:46.231  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 421d went down
+03-23 19:37:46.231  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 421d went down
+03-23 19:37:46.232  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 421f went down
+03-23 19:37:46.232  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 421f went down
+03-23 19:37:46.234  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4220 went down
+03-23 19:37:46.234  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4220 went down
+03-23 19:37:46.414  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.414  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4712.6,R:2194.8,G:1886.7,B:954.8, lux: 77.6, clone:34975
+03-23 19:37:46.501  2228 10840 I WifiService: startScan uid=10349
+03-23 19:37:46.507  2228  4212 D MiuiScanRequestProxy: Package com.autonavi.minimap is in white list
+03-23 19:37:46.508  2228  4212 D MiuiScanRequestProxy: Allow this scan for Package com.autonavi.minimap
+03-23 19:37:46.615  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.615  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4730.4,R:2204.0,G:1884.6,B:963.1, lux: 77.4, clone:34975
+03-23 19:37:46.616  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.617  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4730.9,R:2210.0,G:1892.3,B:957.9, lux: 77.8, clone:34975
+03-23 19:37:46.617  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.617  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4752.5,R:2204.5,G:1891.3,B:963.4, lux: 77.8, clone:34975
+03-23 19:37:46.618  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.618  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4759.2,R:2213.9,G:1896.9,B:963.1, lux: 78.1, clone:34975
+03-23 19:37:46.619  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.619  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4759.2,R:2211.0,G:1903.0,B:967.3, lux: 78.2, clone:34975
+03-23 19:37:46.653  1601  2365 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 0
+03-23 19:37:46.654  2956  4287 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+03-23 19:37:46.654  2956  4287 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:10 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:18 fd_meta:19 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0
+03-23 19:37:46.690  2956  3042 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+03-23 19:37:46.694  2956  4288 D libsensor-parseRGB: the value of RGB [36778.151885 37070.822455 34975.079697 38130.461182 38474.963924 36263.599543 38104.543597 38418.533703 36230.025752 36379.220023 36688.295969 34604.709814]
+03-23 19:37:46.767  9642 10199 I VA_AliveCore:AssistInteractionService: onProcessChanged: processName=com.miui.voiceassist;isRunning=true
+03-23 19:37:46.814  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:46.815  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4792.4,R:2237.8,G:1915.2,B:970.1, lux: 78.8, clone:34975
+03-23 19:37:46.989  7589  7631 D QLM-Service: check_headroom_zone: Timer EVT, Temp: 40064
+03-23 19:37:47.085 12983  7812 D TrafficStats: tagSocket(116) with statsTag=0x4008100, statsUid=-1
+03-23 19:37:47.332  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4221 went down
+03-23 19:37:47.332  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4221 went down
+03-23 19:37:47.333  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4222 went down
+03-23 19:37:47.334  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4222 went down
+03-23 19:37:47.335  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4223 went down
+03-23 19:37:47.335  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4223 went down
+03-23 19:37:47.339  1532  1709 I minksocket: MinkIPC MESSAGE: ( 1532:1709 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302d900 sock = 13, client with node 1 port 4224 went down
+03-23 19:37:47.339  1532  1720 I minksocket: MinkIPC MESSAGE: ( 1532:1720 ) MinkIPC_QRTR_Service:351 minkipc = 0xb4000079b302db80 sock = 20, client with node 1 port 4224 went down
+03-23 19:37:47.357  2228 10840 D WifiNl80211Manager: Scan result ready event
+03-23 19:37:47.357  2228 10840 D WifiNative: Scan result ready event
+03-23 19:37:47.360  2867 26050 I LOWI-9.0.1.68: [LOWI-Scan] lowi_close_record:Scan done in 611060869ms, 47 APs in scan results
+03-23 19:37:47.364  2867  3001 I LOWI-9.0.1.68: [LOWIUtils] responseToOutPostcard - TO: FreeWifiScanObserver, FROM:   LOWI-SERVER, RESP:  LOWI_ASYNC_DISCOVERY_SCAN_RESULTS
+03-23 19:37:47.365  2228  4337 W IE_Capabilities: Unknown RSN cipher suite: 6ac0f00
+03-23 19:37:47.369  2228  4337 W IE_Capabilities: Unknown RSN cipher suite: 6ac0f00
+03-23 19:37:47.372  2228  4337 D WificondScannerImpl: Filtering out 22 scan results.
+03-23 19:37:47.381  1551  2327 I LocSvc_api_v02: ---> locClientSendReq line 2462 QMI_LOC_INJECT_WIFI_AP_DATA_REQ_V02
+03-23 19:37:47.383  1551  3692 I LocSvc_ApiV02: <--- globalRespCb line 270 QMI_LOC_INJECT_WIFI_AP_DATA_REQ_V02
+03-23 19:37:47.393  2228  4212 D WakeupController: Attempted to handleScanResults while not enabled
+03-23 19:37:47.394  2228  4813 E AppScanObserverService: Result available, null observers for user: 0
+03-23 19:37:47.415  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:47.415  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4947.8,R:2307.5,G:1986.6,B:1003.8, lux: 81.7, clone:34975
+03-23 19:37:47.494  2228  4682 I SmartPower: com.tencent.wework:wxa_container0/10395(23067): background->idle(3006ms) R(broadcast start Intent { act=android.net.wifi.SCAN_RESULTS flg=0x4000010 (has extras) }) adj=910.
+03-23 19:37:47.494  2228  4682 I SmartPower: com.tencent.wework/10395(9878): background->idle(3009ms) R(broadcast start Intent { act=android.net.wifi.SCAN_RESULTS flg=0x4000010 (has extras) }) adj=905.
+03-23 19:37:47.614  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:47.614  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:4898.8,R:2283.6,G:1970.3,B:997.1, lux: 80.9, clone:34975
+03-23 19:37:47.814  2956  4351 I libsensor-boledalgo: Write:the value of channelCali C:167.5,R:90.2,G:59.9,B:32.8,scales [0.851686,0.857303,0.844293,0.799774]
+03-23 19:37:47.814  2956  4351 D libsensor-boledalgo: brightness:25,R:36778.2,G:37070.8,B:37070.8,EVENT C:5017.9,R:2340.6,G:2010.1,B:1021.7, lux: 82.7, clone:34975

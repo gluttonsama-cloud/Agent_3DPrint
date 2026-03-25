@@ -42,8 +42,37 @@ const upload = multer({
 });
 
 /**
- * POST /api/remove-background
- * 去除图片背景
+ * @openapi
+ * /api/remove-background:
+ *   post:
+ *     summary: 去除图片背景
+ *     tags: [Upload]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: 图片文件（JPEG/PNG/WEBP，最大 10MB）
+ *     responses:
+ *       200:
+ *         description: 背景移除成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 resultUrl:
+ *                   type: string
+ *                   description: 处理后的图片 URL
+ *                 processingTime:
+ *                   type: number
  */
 router.post('/', upload.single('image'), async (req, res) => {
   const startTime = Date.now();

@@ -49,8 +49,45 @@ const upload = multer({
 });
 
 /**
- * POST /api/upload
- * 上传照片并创建 3D 任务
+ * @openapi
+ * /api/upload:
+ *   post:
+ *     summary: 上传照片并创建 3D 任务
+ *     tags: [Upload]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               photos:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: 照片文件（1-5张）
+ *               mode:
+ *                 type: string
+ *                 enum: [single, multiview]
+ *                 default: single
+ *               enableBackgroundRemoval:
+ *                 type: boolean
+ *                 default: false
+ *     responses:
+ *       200:
+ *         description: 上传成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 taskId:
+ *                   type: string
+ *                 message:
+ *                   type: string
  */
 router.post('/', upload.array('photos', 5), async (req, res) => {
   try {

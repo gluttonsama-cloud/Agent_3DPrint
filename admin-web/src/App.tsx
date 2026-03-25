@@ -15,6 +15,8 @@ import InventoryManagement from './pages/InventoryManagement';
 import AgentVisualization from './pages/AgentVisualization';
 import AgentManagement from './pages/AgentManagement';
 
+const isProduction = import.meta.env.PROD;
+
 export default function App() {
   return (
     <ConfigProvider
@@ -51,7 +53,7 @@ export default function App() {
         }
       }}
     >
-      <BrowserRouter>
+      <BrowserRouter basename={isProduction ? '/admin' : undefined}>
         <Routes>
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Navigate to="/agents" replace />} />

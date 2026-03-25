@@ -136,7 +136,8 @@ export const triggerAgentWorkflow = async (orderData: {
   deviceType?: string;
 }): Promise<AgentWorkflowResult> => {
   const response = await api.post('/agent-workflow/process-order', orderData);
-  return response.data?.data || response.data;
+  // api 拦截器已返回 response.data，所以这里直接返回 response
+  return response as unknown as AgentWorkflowResult;
 };
 
 export interface AgentWorkflowResult {

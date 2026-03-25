@@ -2,10 +2,48 @@ const express = require('express');
 const taskStore = require('../services/taskStore');
 const hunyuan3d = require('../services/hunyuan3d');
 const replicate = require('../services/replicate');
+const { statusValidation } = require('../middleware/validation');
 
 const router = express.Router();
 
-router.get('/:taskId', async (req, res) => {
+/**
+ * @openapi
+ * /api/status/{taskId}:
+ *   get:
+ *     summary: 查询任务状态
+ *     tags: [Upload]
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: 任务 ID
+ *     responses:
+ *       200:
+ *         description: 任务状态
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 taskId:
+ *                   type: string
+ *                 status:
+ *                   type: string
+ *                   enum: [PENDING, IN_PROGRESS, COMPLETED, FAILED]
+ *                 progress:
+ *                   type: number
+ *                   minimum: 0
+ *                   maximum: 100
+ *                 statusMessage:
+ *                   type: string
+ *       404:
+ *         description: 任务不存在
+ */
+router.get('/:taskId', statusValidation, async (req, res) => {
   try {
     const { taskId } = req.params;
     

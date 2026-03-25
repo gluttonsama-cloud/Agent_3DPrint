@@ -19,12 +19,11 @@ export interface OrderQueryParams {
   deviceId?: string;
 }
 
-export const getOrders = async (params?: OrderQueryParams): Promise<{ data: Order[]; total: number }> => {
+export const getOrders = async (params?: OrderQueryParams): Promise<{ items: Order[]; total: number }> => {
   const response = await api.get('/orders', { params });
-  return {
-    data: response.data?.data || response.data || [],
-    total: response.data?.total || response.data?.length || 0,
-  };
+  const items = response.data?.items || response.data?.data?.items || [];
+  const total = response.data?.pagination?.total || response.data?.data?.pagination?.total || items.length || 0;
+  return { items, total };
 };
 
 export const getOrder = async (id: string): Promise<Order> => {
