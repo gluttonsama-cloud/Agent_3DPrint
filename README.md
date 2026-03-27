@@ -1,5 +1,7 @@
 # 3D 头部建模打印系统
 
+演示视频：https://arthurcheng-ys.space/videos.html
+
 > 一站式智能 3D 打印服务平台，支持用户拍照建模、在线预览、下单打印，以及后台订单管理、设备监控、AI 智能助手。包含用户端、管理端、后端服务、GPU 服务四个子系统
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
