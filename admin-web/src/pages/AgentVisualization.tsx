@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card, message, Button, Typography, Dropdown, MenuProps, Switch, Space, Tag, Popconfirm } from 'antd';
-import { PlayCircleOutlined, UpOutlined, DownOutlined, ThunderboltOutlined, WarningOutlined, ToolOutlined, CloudOutlined, ApiOutlined, DeleteOutlined, ClearOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, UpOutlined, DownOutlined, ThunderboltOutlined, WarningOutlined, ToolOutlined, CloudOutlined, ApiOutlined, ClearOutlined } from '@ant-design/icons';
 import { io, Socket } from 'socket.io-client';
-import AgentFlow, { AgentState, EdgeState } from '../components/agent-flow/AgentFlow';
+import AgentFlow from '../components/agent-flow/AgentFlow';
 import AgentTimeline from '../components/agent-flow/AgentTimeline';
 import DecisionPanel from '../components/agent-flow/DecisionPanel';
 import AgentInsightDrawer from '../components/agent-flow/AgentInsightDrawer';
-import { getAgentDecisions, triggerAgentWorkflow, WorkflowStep } from '../services/agentService';
-import { useAgentVisualizationStore, AgentEvent } from '../stores/agentVisualizationStore';
+import { getAgentDecisions, triggerAgentWorkflow, WorkflowStep, AgentEvent as ServiceAgentEvent } from '../services/agentService';
+import { useAgentVisualizationStore, AgentEvent as StoreAgentEvent } from '../stores/agentVisualizationStore';
 
 const { Title, Text } = Typography;
 
@@ -29,7 +29,7 @@ const AgentVisualization: React.FC = () => {
     reset,
   } = useAgentVisualizationStore();
 
-  const [selectedEvent, setSelectedEvent] = useState<AgentEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<StoreAgentEvent | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [useRealData, setUseRealData] = useState(false);
@@ -44,9 +44,15 @@ const AgentVisualization: React.FC = () => {
     const fetchDecisions = async () => {
       try {
         const data = await getAgentDecisions();
-        data.forEach((event: AgentEvent) => {
-          if (!events.find(e => e.id === event.id)) {
-            addEvent(event.agent, event.action || '', event.data, event.type);
+        data.forEach((serviceEvent: ServiceAgentEvent) => {
+          if (!events.find(e => e.id === serviceEvent.id)) {
+            // Map ServiceAgentEvent to StoreAgentEvent
+            addEvent(
+              serviceEvent.agent, 
+              serviceEvent.action || 'decision', 
+              serviceEvent.details, 
+              serviceEvent.type
+            );
           }
         });
       } catch (error) {
@@ -57,7 +63,8 @@ const AgentVisualization: React.FC = () => {
     if (useRealData) {
       fetchDecisions();
       
-      const newSocket = io(import.meta.env.VITE_SOCKET_SERVER || 'http://localhost:3000', {
+      const socketUrl = (import.meta as any).env?.VITE_SOCKET_SERVER || 'http://localhost:3000';
+      const newSocket = io(socketUrl, {
         path: '/socket.io',
         transports: ['websocket'],
       });
@@ -67,8 +74,8 @@ const AgentVisualization: React.FC = () => {
         message.success('已连接到实时 Agent 事件流');
       });
 
-      newSocket.on('agent-event', (event: AgentEvent) => {
-        addEvent(event.agent, event.action || '', event.data, event.type);
+      newSocket.on('agent-event', (event: any) => {
+        addEvent(event.agent, event.action || 'system', event.details || event.data, event.type || 'decision');
       });
       
       newSocket.on('agent-state-change', (state: any) => {
@@ -91,7 +98,7 @@ const AgentVisualization: React.FC = () => {
     setDrawerVisible(true);
   };
 
-  const handleEventClick = (event: AgentEvent) => {
+  const handleEventClick = (event: StoreAgentEvent) => {
     setSelectedEvent(event);
     if (decisionCollapsed) {
       setDecisionCollapsed(false);
@@ -100,10 +107,12 @@ const AgentVisualization: React.FC = () => {
 
   const getStepTitle = (step: WorkflowStep): string => {
     const titles: Record<string, string> = {
-      'receive_order': '接收订单',
-      'allocate_device': '分配设备',
-      'check_and_deduct_inventory': '检查库存',
-      'make_final_decision': '最终决策'
+      'initialize_workflow': '接收订单 & 初始化',
+      'allocate_device': '设备调度评估',
+      'check_inventory': '库存预测与预扣',
+      'evaluate_rules': '业务规则引擎审核',
+      'llm_decision': 'LLM 深度辅助决策',
+      'finalize_execution': '执行决策 & 状态机流转'
     };
     return titles[step.action] || step.action;
   };
@@ -122,7 +131,7 @@ const AgentVisualization: React.FC = () => {
     addThought('coordinator', '路由决策：分配给 Scheduler 和 Inventory');
     await delay(800);
     updateAgentState('coordinator', { status: 'idle', active: false });
-    addEvent('Coordinator', '接收新订单，分配给 Scheduler', { explanation: '检测到新订单，根据路由规则分配给调度 Agent 进行排期。' });
+    addEvent('Coordinator', '接收新订单，分配给 Scheduler', { explanation: '检测到新订单，根据路由规则分配给调度 Agent 进行排期。' }, 'decision');
 
     setEdgeAnimation('e1-2', '{"task": "schedule", "material": "PLA"}', true);
     await delay(1500);
@@ -136,7 +145,7 @@ const AgentVisualization: React.FC = () => {
     addThought('scheduler', '设备 A 空闲，决策完成。');
     await delay(800);
     updateAgentState('scheduler', { status: 'idle', active: false });
-    addEvent('Scheduler', '分配打印机 A', { explanation: '打印机 A 当前空闲且支持该订单材料，已成功分配。' });
+    addEvent('Scheduler', '分配打印机 A', { explanation: '打印机 A 当前空闲且支持该订单材料，已成功分配。' }, 'decision');
 
     setEdgeAnimation('e1-3', '{"task": "deduct", "amount": 50}', true);
     await delay(1500);
@@ -150,7 +159,7 @@ const AgentVisualization: React.FC = () => {
     addThought('inventory', '扣减完成。');
     await delay(800);
     updateAgentState('inventory', { status: 'idle', active: false });
-    addEvent('Inventory', '扣减 PLA 白色 50g', { explanation: '订单需要 50g PLA 白色材料，库存充足，已完成扣减。' });
+    addEvent('Inventory', '扣减 PLA 白色 50g', { explanation: '订单需要 50g PLA 白色材料，库存充足，已完成扣减。' }, 'decision');
     
     setIsSimulating(false);
   };
@@ -207,27 +216,19 @@ const AgentVisualization: React.FC = () => {
     ['coordinator', 'scheduler', 'inventory'].forEach(clearThoughts);
     
     try {
-      message.loading({ content: '正在执行 Agent 协作工作流...', key: 'workflow' });
+      message.loading({ content: '正在启动 Agent 实时协作分析...', key: 'workflow' });
       
-      console.log('[Workflow] 调用 triggerAgentWorkflow...');
       const result = await triggerAgentWorkflow({
         orderId: `ORD-${Date.now()}`,
         customerName: '演示客户',
         material: '白色 PLA',
-        volume: 80,
-        deviceType: 'fdm'
+        volume: 120,
+        deviceType: 'fdm',
+        priority: 'high'
       });
       
-      console.log('[Workflow] API 返回结果:', JSON.stringify(result, null, 2));
-      
-      if (!result) {
-        throw new Error('API 返回空结果');
-      }
-      if (!result.steps) {
-        throw new Error('API 返回结果缺少 steps 字段。收到: ' + JSON.stringify(Object.keys(result)));
-      }
-      if (!Array.isArray(result.steps)) {
-        throw new Error('steps 不是数组: ' + typeof result.steps);
+      if (!result || !result.steps) {
+        throw new Error('API 返回结果异常');
       }
       
       for (const step of result.steps) {
@@ -235,88 +236,65 @@ const AgentVisualization: React.FC = () => {
         
         updateAgentState(agentKey, { 
           status: step.status === 'processing' ? 'processing' : step.status === 'failed' ? 'error' : 'idle', 
-          active: step.status === 'processing' 
+          active: true 
         });
         
         for (const thought of step.thoughts) {
           addThought(agentKey, thought);
-          await delay(600);
+          await delay(800);
         }
         
-        if (step.messagePayload) {
-          const edgeId = step.messagePayload.from === 'coordinator' && step.messagePayload.to === 'scheduler' 
+        if (step.protocol) {
+          const edgeId = step.protocol.from === 'coordinator_agent' && step.protocol.to === 'scheduler_agent' 
             ? 'e1-2' 
-            : 'e1-3';
-          setEdgeAnimation(edgeId, JSON.stringify(step.messagePayload.content), true);
-          await delay(1200);
-          setEdgeAnimation(edgeId, '', false);
+            : step.protocol.from === 'coordinator_agent' && step.protocol.to === 'inventory_agent'
+            ? 'e1-3'
+            : '';
+          
+          if (edgeId) {
+            setEdgeAnimation(edgeId, JSON.stringify({ action: step.action, id: step.protocol.messageId }), true);
+            await delay(1200);
+            setEdgeAnimation(edgeId, '', false);
+          }
         }
         
         updateAgentState(agentKey, { status: 'idle', active: false });
-        
-        const rulesMap: Record<string, string[]> = {
-          'receive_order': ['订单格式验证', '参数完整性检查', '客户信用评估'],
-          'allocate_device': ['设备可用性检查', '设备类型匹配', '负载均衡策略'],
-          'check_and_deduct_inventory': ['库存数量校验', '阈值预警检查', '自动补货触发'],
-        };
-        
-        const confidenceMap: Record<string, number> = {
-          'receive_order': 0.98,
-          'allocate_device': result.summary.deviceAllocated ? 0.95 : 0.72,
-          'check_and_deduct_inventory': result.summary.inventoryDeducted ? 0.92 : 0.65,
-        };
         
         addEvent(
           step.agentName,
           getStepTitle(step),
           {
-            inputs: {
-              '步骤编号': step.step,
-              '执行动作': getStepTitle(step),
-              '执行状态': step.status === 'completed' ? '✓ 已完成' : step.status === 'failed' ? '✗ 失败' : '○ 处理中',
-              'Agent': step.agentName,
-              ...step.data
-            },
-            rules: rulesMap[step.action] || ['默认规则匹配'],
-            confidence: confidenceMap[step.action] || result.decision.confidence,
-            explanation: step.explanation || step.thoughts.join('\n'),
             ...step.data,
-            step: step.step
+            protocol: step.protocol,
+            explanation: step.thoughts.join('\n'),
+            source: step.action === 'llm_decision' ? 'qiniu_glm5' : 'system',
+            confidence: step.data?.confidence || 1.0,
+            stepId: step.step
           },
           step.status === 'failed' || step.status === 'warning' ? 'error' : 'decision'
         );
         
-        await delay(400);
+        await delay(1000);
       }
       
       setLastWorkflowResult({
         decision: result.decision,
-        summary: result.summary,
+        summary: {
+            ...result.summary,
+            deviceAllocated: result.summary.deviceAllocated ? { ...result.summary.deviceAllocated, status: 'allocated' } : null,
+            inventoryDeducted: null // Adapt to visual store interface
+        }
       });
       
       message.success({ 
-        content: `工作流完成！决策: ${result.decision.result}，耗时: ${result.elapsed}ms`, 
+        content: `全流程 Agent 协作完成！状态: ${result.summary.autoApproved ? '自动核准' : '需人工干预'}`, 
         key: 'workflow',
-        duration: 3
+        duration: 4
       });
-      
-      if (result.summary.deviceAllocated) {
-        message.info(`设备已分配: ${result.summary.deviceAllocated.id} (${result.summary.deviceAllocated.type})`);
-      }
-      if (result.summary.inventoryDeducted) {
-        message.info(`库存已扣减: ${result.summary.inventoryDeducted.material} ${result.summary.inventoryDeducted.amount}g`);
-      }
       
     } catch (error) {
-      console.error('[Workflow] 错误详情:', error);
-      const err = error as Error;
-      const stack = (error as any)?.stack || '';
-      const firstLine = stack.split('\n')[0] || '';
-      message.error({ 
-        content: `工作流执行失败: ${err.message}\n位置: ${firstLine}`, 
-        key: 'workflow',
-        duration: 5
-      });
+      console.error('[Workflow Error]:', error);
+      message.error({ content: `工作流执行失败: ${(error as Error).message}`, key: 'workflow' });
     } finally {
       setIsSimulating(false);
     }
@@ -353,7 +331,7 @@ const AgentVisualization: React.FC = () => {
     await delay(800);
     
     updateAgentState('scheduler', { status: 'idle', active: false });
-    addEvent('Scheduler', '重新分配设备', { explanation: '触发容错机制，已将任务重新分配给同等规格的备用打印机 B。' });
+    addEvent('Scheduler', '重新分配设备', { explanation: '触发容错机制，已将任务重新分配给同等规格的备用打印机 B。' }, 'decision');
 
     setIsSimulating(false);
   };
@@ -393,7 +371,12 @@ const AgentVisualization: React.FC = () => {
       flex: 1
     }}>
       <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
-        <AgentFlow onNodeClick={handleNodeClick} agentStates={agentStates} agentThoughts={agentThoughts} edgeStates={edgeStates} />
+        <AgentFlow 
+          onNodeClick={handleNodeClick} 
+          agentStates={agentStates} 
+          agentThoughts={agentThoughts} 
+          edgeStates={edgeStates as any} // Forced cast due to index signature complexity
+        />
       </div>
 
       <div style={{ 
@@ -487,7 +470,7 @@ const AgentVisualization: React.FC = () => {
             <Button type="text" icon={timelineCollapsed ? <UpOutlined /> : <DownOutlined />} onClick={() => setTimelineCollapsed(!timelineCollapsed)} />
           </div>
           <div className="hide-scrollbar" style={{ flex: 1, padding: 24, overflow: 'auto', display: timelineCollapsed ? 'none' : 'block' }}>
-            <AgentTimeline events={events} onEventClick={handleEventClick} />
+            <AgentTimeline events={events as any} onEventClick={handleEventClick as any} />
           </div>
         </div>
       </div>
@@ -511,7 +494,7 @@ const AgentVisualization: React.FC = () => {
             <Button type="text" icon={decisionCollapsed ? <UpOutlined /> : <DownOutlined />} onClick={() => setDecisionCollapsed(!decisionCollapsed)} />
           </div>
           <div className="hide-scrollbar" style={{ flex: 1, overflow: 'auto', display: decisionCollapsed ? 'none' : 'block' }}>
-            <DecisionPanel event={selectedEvent} />
+            <DecisionPanel event={selectedEvent as any} />
           </div>
         </div>
       </div>

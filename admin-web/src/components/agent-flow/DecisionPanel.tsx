@@ -1,5 +1,5 @@
 import React from 'react';
-import { Descriptions, Tag, Progress, Divider, Typography, Card, Alert } from 'antd';
+import { Descriptions, Tag, Progress, Typography, Card, Alert } from 'antd';
 import { AgentEvent } from '../../services/agentService';
 
 const { Title, Text } = Typography;
@@ -14,93 +14,143 @@ const DecisionPanel: React.FC<DecisionPanelProps> = ({ event }) => {
   }
 
   const { details } = event;
-  const isLLMDecision = details?.source === 'llm' || details?.source === 'llm_assisted' || details?.metadata?.source === 'llm_assisted';
+  const isLLMDecision = !!(details?.source === 'llm' || details?.source === 'llm_assisted' || details?.source === 'qiniu_glm5' || details?.llmResponse);
 
   return (
     <div style={{ padding: 24 }}>
       {isLLMDecision && (
         <Alert
-          message="LLM 辅助决策"
-          description="此决策由 AI 大语言模型（七牛云 GLM-5/DeepSeek）生成，提供更智能的分析和建议"
+          message="LLM 实时决策"
+          description="此决策由大语言模型实时生成（非硬编码）。Agent 基于当前状态、历史数据和业务规则进行深度推理。"
           type="success"
           showIcon
           style={{ marginBottom: 24 }}
         />
       )}
 
-      <Title level={4} style={{ marginTop: 0 }}>输入数据快照</Title>
-      <Descriptions column={1} size="small" bordered style={{ marginBottom: 24 }}>
-        {details?.inputs && Object.entries(details.inputs).map(([key, value]) => (
-          <Descriptions.Item label={key} key={key}><strong>{String(value)}</strong></Descriptions.Item>
-        ))}
-        {(!details?.inputs || Object.keys(details.inputs).length === 0) && (
-          <Descriptions.Item label="数据">无输入数据</Descriptions.Item>
-        )}
-      </Descriptions>
-
-      <Title level={4}>匹配规则</Title>
-      <div style={{ marginBottom: 24 }}>
-        {details?.rules && details.rules.length > 0 ? (
-          details.rules.map((rule: string, idx: number) => (
-            <Tag key={idx} className="brutal-tag-dark" style={{ padding: '4px 8px', fontSize: 14 }}>{rule}</Tag>
-          ))
-        ) : (
-          <Text type="secondary">无规则匹配（LLM 直接决策）</Text>
-        )}
-      </div>
-
-      <Title level={4}>置信度评分</Title>
-      <div style={{ marginBottom: 24 }}>
-        <Progress 
-          percent={Math.round((details?.confidence || 0) * 100)} 
-          strokeColor="#708090" 
-          railColor="#E2E2D5"
-          size={["100%", 12]}
-          format={(percent) => `${percent}% ${isLLMDecision ? '(AI 生成)' : ''}`}
-        />
-      </div>
-
-      {details?.llmEvaluation && (
+      {/* 通信协议区块 */}
+      {details?.protocol && (
         <>
-          <Title level={4}>LLM 评估</Title>
-          <Card size="small" style={{ marginBottom: 24, borderColor: '#708090' }}>
+          <Title level={4} style={{ marginTop: 0 }}>通信协议 (Protocol)</Title>
+          <Card size="small" style={{ marginBottom: 24, background: '#F0F4F8', border: '2px solid #2D2D2D', boxShadow: '4px 4px 0px 0px #2D2D2D' }}>
             <Descriptions column={1} size="small">
-              <Descriptions.Item label="是否同意算法">{details.llmEvaluation.agree ? '✓ 同意' : '✗ 有不同建议'}</Descriptions.Item>
-              {details.llmEvaluation.suggestedDeviceId && (
-                <Descriptions.Item label="LLM 建议设备">{details.llmEvaluation.suggestedDeviceId}</Descriptions.Item>
-              )}
-              {details.llmEvaluation.topPriorityMaterial && (
-                <Descriptions.Item label="LLM 建议优先补货">{details.llmEvaluation.topPriorityMaterial}</Descriptions.Item>
-              )}
-              <Descriptions.Item label="LLM 置信度">{Math.round(details.llmEvaluation.confidence * 100)}%</Descriptions.Item>
+              <Descriptions.Item label="消息 ID"><Text code>{details.protocol.messageId}</Text></Descriptions.Item>
+              <Descriptions.Item label="类型"><Tag color="purple">{details.protocol.type}</Tag></Descriptions.Item>
+              <Descriptions.Item label="路由">{details.protocol.from} → {details.protocol.to}</Descriptions.Item>
+              <Descriptions.Item label="优先级"><Tag color={details.protocol.priority === 'high' ? 'red' : 'blue'}>{details.protocol.priority}</Tag></Descriptions.Item>
             </Descriptions>
           </Card>
         </>
       )}
 
-      <Title level={4}>决策解释</Title>
+      {/* 算法评分区块 */}
+      {details?.scores && (
+        <>
+          <Title level={4}>调度算法评分 (Scoring)</Title>
+          <div style={{ marginBottom: 24, padding: 16, background: '#FCFCFA', border: '2px solid #2D2D2D', boxShadow: '4px 4px 0px 0px #2D2D2D' }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text>负载均衡 (Load)</Text>
+                <Text strong>{(details.scores.load * 100).toFixed(0)}分</Text>
+              </div>
+              <Progress percent={details.scores.load * 100} strokeColor="#708090" size="small" showInfo={false} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text>预计耗时 (Time)</Text>
+                <Text strong>{(details.scores.time * 100).toFixed(0)}分</Text>
+              </div>
+              <Progress percent={details.scores.time * 100} strokeColor="#708090" size="small" showInfo={false} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text>打印质量 (Quality)</Text>
+                <Text strong>{(details.scores.quality * 100).toFixed(0)}分</Text>
+              </div>
+              <Progress percent={details.scores.quality * 100} strokeColor="#708090" size="small" showInfo={false} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text>经济平衡 (Cost)</Text>
+                <Text strong>{(details.scores.cost * 100).toFixed(0)}分</Text>
+            </div>
+            <Progress percent={details.scores.cost * 100} strokeColor="#708090" size="small" showInfo={false} />
+          </div>
+        </>
+      )}
+
+      {/* 库存预测区块 */}
+      {details?.forecast && (
+        <>
+          <Title level={4}>库存趋势预测 (Forecast)</Title>
+          <Card size="small" style={{ marginBottom: 24, background: '#FFF7E6', border: '2px solid #FAAD14', boxShadow: '4px 4px 0px 0px #FAAD14' }}>
+            <Descriptions column={1} size="small">
+              <Descriptions.Item label="预测周期">未来 7 天</Descriptions.Item>
+              <Descriptions.Item label="预计总消耗">{details.forecast.predictedConsumption.toFixed(1)}g</Descriptions.Item>
+              <Descriptions.Item label="预测信心">
+                <Progress percent={Math.round(details.forecast.confidence * 100)} size="small" strokeColor="#FAAD14" />
+              </Descriptions.Item>
+              <Descriptions.Item label="趋势模型">{details.forecast.method || '线性回归'}</Descriptions.Item>
+            </Descriptions>
+          </Card>
+        </>
+      )}
+
+      {/* 规则引擎区块 */}
+      {details?.rules && (
+        <>
+          <Title level={4}>规则引擎评估 (Rules)</Title>
+          <div style={{ marginBottom: 24 }}>
+            {details.rules.map((rule: any, idx: number) => (
+              <div key={idx} style={{ marginBottom: 16, borderLeft: '4px solid #2D2D2D', paddingLeft: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text strong>{rule.name}</Text>
+                  <Tag color={rule.result === 'REJECT' ? 'red' : 'green'}>{rule.result}</Tag>
+                </div>
+                <Text type="secondary" style={{ fontSize: 13 }}>{rule.rationale}</Text>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <Title level={4}>决策解释与判定</Title>
       <div style={{ 
         background: '#F5F5F0', 
         padding: 16, 
         border: '3px solid #2D2D2D',
         boxShadow: '4px 4px 0px 0px #2D2D2D',
-        fontSize: 16,
-        fontWeight: 500
+        fontSize: 15,
+        fontWeight: 500,
+        marginBottom: 24
       }}>
         {details?.explanation || details?.rationale || '无决策解释'}
       </div>
 
+      {details?.confidence !== undefined && (
+        <div style={{ marginBottom: 24 }}>
+          <Text strong>决策置信度 (Confidence)</Text>
+          <Progress 
+            percent={Math.round(details.confidence * 100)} 
+            strokeColor="#2D2D2D" 
+            railColor="#E2E2D5"
+          />
+        </div>
+      )}
+
       {details?.llmResponse && (
         <>
-          <Title level={5} style={{ marginTop: 24 }}>LLM 原始响应</Title>
+          <Title level={5} style={{ marginTop: 24 }}>LLM 原始决策 Trace (Matrix Mode)</Title>
           <pre style={{ 
-            background: '#1a1a1a', 
-            color: '#f0f0f0', 
+            background: '#0D0D0D', 
+            color: '#00FF41', 
             padding: 16, 
-            borderRadius: 8,
-            fontSize: 12,
+            borderRadius: 4,
+            fontSize: 11,
             overflow: 'auto',
-            maxHeight: 300
+            maxHeight: 300,
+            fontFamily: 'Consolas, "Courier New", monospace',
+            border: '2px solid #00FF41',
+            boxShadow: '0 0 10px rgba(0, 255, 65, 0.2)'
           }}>
             {details.llmResponse}
           </pre>

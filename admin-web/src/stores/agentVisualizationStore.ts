@@ -6,22 +6,20 @@ export interface AgentEvent {
   agent: string;
   action: string;
   timestamp: string;
+  data?: any; // For backward compatibility with existing components
   details?: {
     inputs?: Record<string, any>;
-    rules?: string[];
+    rules?: any[];
     confidence?: number;
     explanation?: string;
     rationale?: string;
-    llmEvaluation?: {
-      agree: boolean;
-      suggestedDeviceId?: string;
-      topPriorityMaterial?: string;
-      confidence: number;
-    };
+    protocol?: any;
+    scores?: any;
+    forecast?: any;
     llmResponse?: string;
     [key: string]: any;
   };
-  type?: string;
+  type: string;
   orderId?: string;
   decision?: string;
 }
@@ -34,6 +32,8 @@ export interface AgentState {
 export interface EdgeState {
   message: string;
   animating: boolean;
+  isAnimating?: boolean; // For component compatibility
+  payload?: string; // For component compatibility
 }
 
 interface AgentVisualizationState {
@@ -60,7 +60,13 @@ interface AgentVisualizationState {
   reset: () => void;
 }
 
-const initialState = {
+const initialState: {
+  events: AgentEvent[];
+  agentStates: Record<string, AgentState>;
+  agentThoughts: Record<string, string[]>;
+  edgeStates: Record<string, EdgeState>;
+  lastWorkflowResult: any;
+} = {
   events: [],
   agentStates: {
     coordinator: { status: 'idle', active: false },

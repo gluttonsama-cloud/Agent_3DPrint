@@ -4,10 +4,9 @@ export interface AgentEvent {
   id: string;
   type: string;
   agent: string;
-  orderId: string;
-  decision: string;
-  message?: string;
-  cot?: string[];
+  action?: string;
+  orderId?: string;
+  decision?: string;
   timestamp: string;
   details: any;
 }
@@ -134,9 +133,9 @@ export const triggerAgentWorkflow = async (orderData: {
   material: string;
   volume: number;
   deviceType?: string;
+  priority?: string;
 }): Promise<AgentWorkflowResult> => {
   const response = await api.post('/agent-workflow/process-order', orderData);
-  // api 拦截器已返回 response.data，所以这里直接返回 response
   return response as unknown as AgentWorkflowResult;
 };
 
@@ -151,16 +150,10 @@ export interface AgentWorkflowResult {
   };
   steps: WorkflowStep[];
   summary: {
-    deviceAllocated?: {
-      id: string;
-      type: string;
-      status: string;
-    } | null;
-    inventoryDeducted?: {
-      material: string;
-      amount: number;
-    } | null;
+    deviceAllocated?: { id: string; type: string } | null;
+    inventoryStatus?: { material: string; sufficient: boolean } | null;
     autoApproved: boolean;
+    stateTransitions?: string[];
   };
 }
 
@@ -173,12 +166,7 @@ export interface WorkflowStep {
   timestamp: string;
   thoughts: string[];
   data?: any;
-  messagePayload?: {
-    from: string;
-    to: string;
-    type: string;
-    content: any;
-  };
+  protocol?: any;
 }
 
 /**
