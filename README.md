@@ -2,7 +2,7 @@
 
 演示视频：https://arthurcheng-ys.space/videos.html
  ## 访问服务
- - 用户端：http://111.62.241.109
+ - 用户端：http://111.62.241.109（测试花费较高，可能会欠费限额，谨慎使用）
  - 管理端：http://111.62.241.109/admin
  - 后端 API: http://111.62.241.109/api
  - API 文档：http://111.62.241.109/api/api-docs
