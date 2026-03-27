@@ -160,6 +160,10 @@ DocumentRevisions-V100/
 .sisyphus/
 .ruff_cache/
 nul
+.agents/
+.opencode/
+openspec/
+skills-lock.json
 
 # Capacitor / Mobile 构建产物
 **/android/
