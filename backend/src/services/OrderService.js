@@ -14,6 +14,7 @@ const { addOrderToQueue } = require('../queues/orderQueue');
 const { AgentRegistry } = require('../agents/registry');
 const { NotFoundError, ValidationError, AppError } = require('../middleware/errorHandler');
 const mongoose = require('mongoose');
+const taskStore = require('./taskStore');
 
 /**
  * 订单服务类
@@ -53,8 +54,10 @@ class OrderService {
    */
   async createOrder(orderData) {
     const {
-      userId,
-      photos,
+      userId: originalUserId,
+      photos: originalPhotos,
+      taskId,
+      modelUrl,
       deviceType,
       material,
       quantity,
@@ -63,13 +66,21 @@ class OrderService {
       totalPrice
     } = orderData;
 
-    // 验证必填字段
-    if (!userId) {
-      throw new ValidationError('userId 是必填字段');
+    // 处理 userId: 如果不是有效的 ObjectId (如前端传来的 "user_xxx")，则映射为固定的游客 ID
+    let userId = originalUserId;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      console.log(`[OrderService] 无效或缺失 userId: ${userId}, 使用游客 ID`);
+      userId = '000000000000000000000000'; // 预设的游客 ObjectId
     }
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      throw new ValidationError('无效的 userId 格式');
+    // 处理照片: 如果没有直接提供照片，但提供了 taskId，则尝试从任务存储中获取
+    let photos = originalPhotos;
+    if ((!photos || photos.length === 0) && taskId) {
+      const task = taskStore.getTask(taskId);
+      if (task && task.photoUrls && task.photoUrls.length > 0) {
+        photos = task.photoUrls;
+        console.log(`[OrderService] 从任务 ${taskId} 获取到照片: ${photos.length} 张`);
+      }
     }
 
     // 如果没有提供 items，则根据参数创建
@@ -117,10 +128,13 @@ class OrderService {
       status: OrderStates.PENDING_REVIEW, // 初始状态：待审核
       metadata: {
         sourcePhotos: photos || [],
+        taskId: taskId || null,
+        modelUrl: modelUrl || null,
         deviceType,
         materialType: material,
         createdAt: new Date().toISOString()
-      }
+      },
+      generatedModelUrl: modelUrl || null
     });
 
     await order.save();

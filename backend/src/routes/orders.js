@@ -14,6 +14,34 @@ const { orderService } = require('../services/OrderService');
 const { agentRegistry } = require('../agents/registry');
 const { asyncHandler, NotFoundError, ValidationError, AppError } = require('../middleware/errorHandler');
 const { responseMiddleware } = require('../utils/response');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
+const qiniu = require('../services/qiniu');
+
+// 配置 multer（临时存储）
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../../uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 5
+  }
+});
 
 // 使用全局 Agent 注册中心（在 app.js 中初始化）
 orderService.setAgentRegistry(agentRegistry);
@@ -36,9 +64,41 @@ router.use(responseMiddleware());
  *   totalPrice: 299.00
  * }
  */
-router.post('/', asyncHandler(async (req, res) => {
-  const orderData = req.body;
+router.post('/', upload.array('photos', 5), asyncHandler(async (req, res) => {
+  let orderData = req.body;
   
+  // 如果是 multipart 请求，处理上传的文件
+  if (req.files && req.files.length > 0) {
+    console.log(`[OrdersRoute] 收到 ${req.files.length} 张上传照片`);
+    const uploadPromises = req.files.map(async (file) => {
+      try {
+        const result = await qiniu.uploadFile(file.path, file.filename);
+        // 上传完成后删除本地临时文件
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+        return result.url;
+      } catch (error) {
+        console.error(`[OrdersRoute] 渠牛上传失败: ${file.filename}`, error);
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+        return null;
+      }
+    });
+    
+    const photoUrls = (await Promise.all(uploadPromises)).filter(url => url !== null);
+    orderData.photos = photoUrls;
+  }
+  
+  // 处理可能存在的 JSON 字符串字段 (FormData 发送复杂对象时常需要 stringify)
+  if (typeof orderData.specifications === 'string') {
+    try { orderData.specifications = JSON.parse(orderData.specifications); } catch (e) {}
+  }
+  if (typeof orderData.priceDetails === 'string') {
+    try { orderData.priceDetails = JSON.parse(orderData.priceDetails); } catch (e) {}
+  }
+
   // 创建订单
   const order = await orderService.createOrder(orderData);
   
