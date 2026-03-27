@@ -7,9 +7,42 @@ const requestIdMiddleware = require('./middleware/requestId');
 const { errorHandler } = require('./middleware/errorHandler');
 const requestLogger = require('./middleware/requestLogger');
 
+const http = require('http');
+const { Server } = require('socket.io');
+const { agentEventEmitter } = require('./utils/AgentEventEmitter');
+
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+// Socket.IO event mapping
+io.on('connection', (socket) => {
+  console.log('[Socket.io] Client connected:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('[Socket.io] Client disconnected:', socket.id);
+  });
+});
+
+agentEventEmitter.on('agent_event', (event) => {
+  // Generic agent event
+  io.emit('agent-event', event);
+
+  // Map backend event types to frontend expected formats
+  if (event.type === 'agent_state_changed') {
+    io.emit('agent-state-change', event.data);
+  } else if (event.type === 'tool_call_started') {
+    io.emit('agent-tool-start', event.data);
+  } else if (event.type === 'tool_call_completed') {
+    io.emit('agent-tool-complete', event.data);
+  }
+});
 
 app.use(cors());
 app.use(requestIdMiddleware);
@@ -111,12 +144,13 @@ app.use(errorHandler);
 
 // 启动服务器
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════════════════════╗
 ║  3D Head Modeling API - v2.0.0 (混元 + 七牛云版)        ║
 ╠════════════════════════════════════════════════════════╣
 ║  Server running on port ${PORT}                          ║
+║  Socket.io WebSocket Server Running                    ║
 ║  Environment: ${process.env.NODE_ENV || 'development'}
 ║  Health: http://localhost:${PORT}/health                 ║
 ╚════════════════════════════════════════════════════════╝
