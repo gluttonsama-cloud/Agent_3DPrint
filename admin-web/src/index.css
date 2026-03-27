@@ -72,6 +72,11 @@ body {
   font-weight: bold;
 }
 
+.brutal-tag-dark {
+  background-color: #2D2D2D !important;
+  color: #F5F5F0 !important;
+}
+
 .react-flow__node {
   border: 3px solid #2D2D2D !important;
   box-shadow: 4px 4px 0px 0px #2D2D2D !important;

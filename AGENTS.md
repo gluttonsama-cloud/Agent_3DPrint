@@ -3,14 +3,13 @@
 本文档用于在当前代码库中统一工作方式、搭建开发环境以及规范代码风格、构建与测试流程。当前仓库以文档/计划为主，尚未包含可执行代码，后续阶段将逐步引入后端与前端代码。
 
 ## 1. 项目总体架构与技术栈
-- 前端：uni-app（多端统一代码 base）
+- 前端：React 19 + Vite + Capacitor (用于移动端封装)
 - 后端：Node.js + Express
-- 3D 生成：混元 API 为主，Replicate API 为备选
-- 背景抠图：remove.bg / clipdrop 等 API（可选）
-- 存储：七牛云
-- 数据库与队列（计划/假设）：MongoDB、Bull + Redis
-- 未来扩展（阶段 2）：本地部署 ComfyUI，接入 ComfyUI Provider
-- 统一调度：Meshy/Replicate/ComfyUI 的混合调度策略
+- 3D 生成：腾讯混元 API 为主，Replicate API 为备选
+- 背景抠图：本地 GPU 服务 (rembg) 或 remove.bg API
+- 存储：七牛云 Kodo
+- 数据库与队列：MongoDB、Bull + Redis
+- 统一调度：Meshy/Replicate/混元 的混合调度策略
 
 以上设计在 .sisyphus/plans 与 plan_draft 详细实施文档中有完整描述，见以下引用文件：
 - .sisyphus/plans/comfyui-hybrid-plan.md
@@ -28,22 +27,24 @@
   - detailed-implementation-guide-part3.md
   - team-discussion-3d-head-modeling.md
 
-当前仓库中尚无可执行代码文件（如 .js/.ts/.py 等），仅有设计/实现草案文档与团队讨论记录。
+当前仓库已包含完整的后端、管理端、用户端和 GPU 服务代码。可以根据各子目录下的 `package.json` 运行相应的开发和构建命令。
 
 ## 3. 构建/ lint/ 测试（当前仓库状态）
-- 代码层面：尚无现成可执行后端/前端代码，因此无现成的构建与测试脚本。
-- 计划中的后端栈（待实现）：Node.js + Express；使用 Bull + Redis 作为任务队列；MongoDB 作为数据库；阿里云 OSS 作为对象存储。
-- 计划中的前端栈：uni-app + Three.js，用于拍照引导、照片上传、3D 预览等页面。
-- 未来在实际代码实现后，将提供如下常用命令：
-  - 安装依赖并构建（后端示例，Node.js/Express）
-    - npm install
-    - npm run build (如存在构建脚本)
-  - 启动开发服务器
-    - npm run dev 或 npx nodemon src/app.js
-  - 运行 lint
-    - npx eslint . --ext .js,.ts
-  - 运行测试
-    - npm test
+- 代码层面：各子系统均已实现基础架构。
+- 后端栈：Node.js + Express；使用 Bull + Redis 作为任务队列；MongoDB 作为数据库；七牛云 Kodo 作为对象存储。
+- 前端栈：React 19 + Three.js + Tailwind CSS 4，用于拍照引导、照片上传、3D 预览等。
+- 常用命令：
+  - 后端 (backend):
+    - `npm install`
+    - `npm run dev` (开发模式)
+    - `npm test` (运行测试)
+  - 管理端 (admin-web) / 用户端 (ai-3d-head-modeler):
+    - `npm install`
+    - `npm run dev` (启动 Vite 开发服务器)
+    - `npm run build` (构建生产版本)
+  - GPU 服务 (local-gpu-service):
+    - `pip install -r requirements.txt`
+    - `python start_server.py`
 
 - 本仓库下的计划文档会成为日后实现的唯一参考，请在代码实现阶段保持与计划一致的结构与命名规则。
 

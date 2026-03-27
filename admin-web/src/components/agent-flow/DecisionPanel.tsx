@@ -42,7 +42,7 @@ const DecisionPanel: React.FC<DecisionPanelProps> = ({ event }) => {
       <div style={{ marginBottom: 24 }}>
         {details?.rules && details.rules.length > 0 ? (
           details.rules.map((rule: string, idx: number) => (
-            <Tag color="#2D2D2D" key={idx} style={{ color: '#F5F5F0', padding: '4px 8px', fontSize: 14 }}>{rule}</Tag>
+            <Tag key={idx} className="brutal-tag-dark" style={{ padding: '4px 8px', fontSize: 14 }}>{rule}</Tag>
           ))
         ) : (
           <Text type="secondary">无规则匹配（LLM 直接决策）</Text>

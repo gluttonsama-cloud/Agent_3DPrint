@@ -4,6 +4,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
+[![Capacitor](https://img.shields.io/badge/Capacitor-8.x-119EFF?logo=capacitor&logoColor=white)](https://capacitorjs.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-7.x-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -28,7 +29,7 @@
 ### 📱 用户端 (ai-3d-head-modeler)
 - **3D 头部建模**: 拍照上传 → AI 生成 3D 模型 → 在线预览 → 下单打印
 - **完整用户流程**: 引导页 → 上传页 → 处理中 → 预览 → 下单 → 支付 → 订单跟踪
-- **技术栈**: uni-app + Three.js，支持多端部署
+- **技术栈**: React 19 + Three.js + Capacitor，支持 Android/iOS/Web 部署
 
 ### 🖥️ 管理端 (admin-web)
 - **🤖 AI 智能助手**: 订单审核助手 + 设备诊断助手
@@ -174,8 +175,10 @@ Guide → Upload → Processing → Preview → Order → Payment → OrderStatu
 | 服务 | 用途 |
 |------|------|
 | 腾讯混元 API | 3D 模型生成 |
+| Replicate API | 3D 模型生成（备选） |
 | 七牛云 Kodo | 对象存储 |
 | OctoPrint | 打印机集成 |
+| DeepSeek-R1 | AI Agent 决策模型 |
 
 ---
 
@@ -199,12 +202,13 @@ docker-compose up -d
 docker-compose logs -f
 
 # 验证服务状态
-curl http://localhost:3001/health
+curl http://111.62.241.109/api/health
 
 # 访问服务
-# 前端：http://localhost:3000
-# 后端 API: http://localhost:3001
-# API 文档：http://localhost:3001/api-docs
+# 用户端：http://111.62.241.109
+# 管理端：http://111.62.241.109/admin
+# 后端 API: http://111.62.241.109/api
+# API 文档：http://111.62.241.109/api/api-docs
 ```
 
 ### 开发模式
@@ -214,29 +218,29 @@ curl http://localhost:3001/health
 cd backend
 npm install
 npm run dev
-# API: http://localhost:3001
+# API: http://111.62.241.109/api
 
 # 管理端（Web 后台）
 cd admin-web
 npm install
 npm run dev
-# 访问 http://localhost:3001
+# 访问 http://111.62.241.109/admin
 
 # 用户端（手机应用）
 cd ai-3d-head-modeler
 npm install
 npm run dev
-# 访问 http://localhost:3000
+# 访问 http://111.62.241.109/
 
 # GPU 服务（需要 Python 环境）
 cd local-gpu-service
 pip install -r requirements.txt
 python src/server.py
-# 服务：http://localhost:7000
+# 服务：http://111.62.241.109:7000
 
 # 验证各服务状态
-curl http://localhost:3001/health        # 后端
-curl http://localhost:7000/api/remove-bg/health  # GPU 服务
+curl http://111.62.241.109/api/health        # 后端
+curl http://111.62.241.109:7000/api/remove-bg/health  # GPU 服务
 ```
 
 ---
@@ -300,17 +304,17 @@ curl http://localhost:7000/api/remove-bg/health  # GPU 服务
 ├── ai-3d-head-modeler/         # 用户端 (手机 App)
 │   ├── src/
 │   │   ├── pages/             # 页面组件
-│   │   │   ├── GuidePage.vue          # 拍照引导页
-│   │   │   ├── UploadPage.vue         # 照片上传页
-│   │   │   ├── ProcessingPage.vue     # 处理进度页
-│   │   │   ├── PreviewPage.vue        # 3D 预览页
-│   │   │   ├── OrderPage.vue          # 下单页
-│   │   │   ├── PaymentPage.vue        # 支付页
-│   │   │   └── OrderStatusPage.vue    # 订单状态页
+│   │   │   ├── GuidePage.tsx          # 拍照引导页
+│   │   │   ├── UploadPage.tsx         # 照片上传页
+│   │   │   ├── ProcessingPage.tsx     # 处理进度页
+│   │   │   ├── PreviewPage.tsx        # 3D 预览页
+│   │   │   ├── OrderPage.tsx          # 下单页
+│   │   │   ├── PaymentPage.tsx        # 支付页
+│   │   │   └── OrderStatusPage.tsx    # 订单状态页
 │   │   ├── components/        # 通用组件
-│   │   │   ├── PhotoUploader.vue      # 照片上传组件
-│   │   │   ├── ModelViewer.vue        # 3D 模型查看器
-│   │   │   └── ProgressBar.vue        # 进度条组件
+│   │   │   ├── PhotoUploader.tsx      # 照片上传组件
+│   │   │   ├── ModelViewer.tsx        # 3D 模型查看器
+│   │   │   └── ProgressBar.tsx        # 进度条组件
 │   │   ├── services/          # API 服务
 │   │   │   ├── api.ts
 │   │   │   ├── uploadService.ts
@@ -545,7 +549,7 @@ POST /api/devices/:id/ai-diagnose
 ```javascript
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:3001');
+const socket = io('http://111.62.241.109');
 
 // 监听订单更新
 socket.on('order:updated', (order) => {
@@ -698,7 +702,7 @@ docker-compose logs -f     # 查看日志
 ### Q: WebSocket 连接失败？
 
 **排查步骤**：
-1. 确认后端服务运行正常：`curl http://localhost:3001/health`
+1. 确认后端服务运行正常：`curl http://111.62.241.109:3001/health`
 2. 检查前端配置：`VITE_SOCKET_SERVER` 是否正确
 3. 检查浏览器控制台：查看 WebSocket 连接错误
 4. 确认端口未被占用：`netstat -an | grep 3001`
@@ -738,6 +742,6 @@ MIT License
 
 ---
 
-**文档版本**: v1.1  
-**最后更新**: 2026-03-13  
-**维护者**: AI Agent Team
+**文档版本**: v1.2  
+**最后更新**: 2026-03-27  
+**维护者**: 程彦硕

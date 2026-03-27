@@ -18,25 +18,25 @@ const initialAgents: Agent[] = [
   {
     id: 'coordinator',
     name: '协调 Agent',
-    role: 'System Orchestrator',
+    role: '系统编排师',
     status: 'active',
-    capabilities: ['Order Routing', 'Global State Management', 'Error Handling'],
+    capabilities: ['订单分发', '全局状态管理', '错误处理'],
     systemPrompt: 'You are the Coordinator Agent for a 3D printing farm. Your primary responsibility is to receive incoming orders, validate their parameters, and route them to the appropriate specialized agents (Scheduler or Inventory).',
   },
   {
     id: 'scheduler',
     name: '调度 Agent',
-    role: 'Resource Allocator',
+    role: '资源调度员',
     status: 'active',
-    capabilities: ['Printer Assignment', 'Time Estimation', 'Queue Management'],
+    capabilities: ['打印机分配', '耗时预估', '队列管理'],
     systemPrompt: 'You are the Scheduler Agent. Your job is to assign 3D printing tasks to the most optimal available printer based on material compatibility and availability.',
   },
   {
     id: 'inventory',
     name: '库存 Agent',
-    role: 'Material Manager',
+    role: '物料管理员',
     status: 'active',
-    capabilities: ['Stock Tracking', 'Procurement Alerts', 'Material Deduction'],
+    capabilities: ['库存追踪', '采购预警', '物料核减'],
     systemPrompt: 'You are the Inventory Agent. You manage the stock levels of all 3D printing filaments. Deduct stock when a print starts and alert the Coordinator if stock falls below the 20% threshold.',
   },
 ];
@@ -64,12 +64,17 @@ const AgentManagement: React.FC = () => {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => {
-        let color = status === 'active' ? '#52c41a' : status === 'error' ? '#f5222d' : '#d9d9d9';
-        return <Tag color={color} style={{ borderRadius: 0, border: '2px solid #2D2D2D', color: '#2D2D2D', fontWeight: 'bold' }}>{status.toUpperCase()}</Tag>;
+        const statusMap: Record<string, { label: string, color: string }> = {
+          'active': { label: '活跃', color: '#52c41a' },
+          'inactive': { label: '停用', color: '#d9d9d9' },
+          'error': { label: '异常', color: '#f5222d' }
+        };
+        const { label, color } = statusMap[status] || { label: status, color: '#d9d9d9' };
+        return <Tag color={color} style={{ borderRadius: 0, border: '2px solid #2D2D2D', color: '#2D2D2D', fontWeight: 'bold' }}>{label.toUpperCase()}</Tag>;
       },
     },
     {
-      title: '能力 (Capabilities)',
+      title: '能力 (能力集)',
       dataIndex: 'capabilities',
       key: 'capabilities',
       render: (capabilities: string[]) => (
@@ -207,9 +212,9 @@ const AgentManagement: React.FC = () => {
           </Form.Item>
           <Form.Item name="status" label={<span style={{ fontWeight: 'bold', color: '#2D2D2D' }}>状态</span>} initialValue="active">
             <Select style={{ borderRadius: 0 }}>
-              <Select.Option value="active">Active</Select.Option>
-              <Select.Option value="inactive">Inactive</Select.Option>
-              <Select.Option value="error">Error</Select.Option>
+              <Select.Option value="active">活跃 (Active)</Select.Option>
+              <Select.Option value="inactive">停用 (Inactive)</Select.Option>
+              <Select.Option value="error">异常 (Error)</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item name="capabilities" label={<span style={{ fontWeight: 'bold', color: '#2D2D2D' }}>能力 (用逗号分隔)</span>} rules={[{ required: true, message: '请输入至少一项能力' }]}>

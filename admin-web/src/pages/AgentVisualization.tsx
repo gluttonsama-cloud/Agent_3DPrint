@@ -279,7 +279,7 @@ const AgentVisualization: React.FC = () => {
             },
             rules: rulesMap[step.action] || ['默认规则匹配'],
             confidence: confidenceMap[step.action] || result.decision.confidence,
-            explanation: step.thoughts.join('\n'),
+            explanation: step.explanation || step.thoughts.join('\n'),
             ...step.data,
             step: step.step
           },
