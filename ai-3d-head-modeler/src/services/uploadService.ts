@@ -12,7 +12,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
  * 照片文件接口
  */
 export interface PhotoFile {
-  file: File;
+  file?: File;
+  base64?: string;
   view: string;
 }
 
@@ -207,12 +208,23 @@ export async function uploadPhotos(
 
     const base64Photos = await Promise.all(
       photos.map(async (photo, index) => {
-        console.log(`照片 ${index}:`, {
+        if (photo.base64) {
+          console.log(`照片 ${index}: 使用已有 Base64 数据`);
+          // 如果带有 DataURL 前缀，只取数据部分
+          return photo.base64.includes(',') ? photo.base64.split(',')[1] : photo.base64;
+        }
+
+        if (!photo.file) {
+          throw new Error(`照片 ${index} 缺少文件对象或 Base64 数据`);
+        }
+
+        console.log(`照片 ${index}: 使用 File 对象并压缩`, {
           name: photo.file.name,
           size: photo.file.size,
           type: photo.file.type
         });
-        // 压缩图片到 3MB 以内（混元 API 限制 10MB，留出余量）
+        
+        // 压缩图片到 3MB 以内
         const compressed = await compressImage(photo.file, 3000);
         console.log(`照片 ${index} 压缩后大小: ${Math.round(compressed.length * 0.75 / 1024)}KB`);
         return compressed;

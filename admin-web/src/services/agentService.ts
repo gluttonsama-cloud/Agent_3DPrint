@@ -7,6 +7,7 @@ export interface AgentEvent {
   action?: string;
   orderId?: string;
   decision?: string;
+  message?: string;
   timestamp: string;
   details: any;
 }

@@ -8,6 +8,7 @@ import Guide from './pages/Guide';
 import Upload from './pages/Upload';
 import Processing from './pages/Processing';
 import Preview from './pages/Preview';
+import AnimePreview from './pages/AnimePreview';
 import Order from './pages/Order';
 import PaymentResult from './pages/PaymentResult';
 import OrderHistory from './pages/OrderHistory';
@@ -19,6 +20,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Guide />} />
         <Route path="/upload" element={<Upload />} />
+        <Route path="/anime-preview" element={<AnimePreview />} />
         <Route path="/processing" element={<Processing />} />
         <Route path="/preview" element={<Preview />} />
         <Route path="/order" element={<Order />} />

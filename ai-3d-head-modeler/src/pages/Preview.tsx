@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Menu, CheckCircle, ZoomIn, ZoomOut, Grid, Rotate3D, ShoppingCart, Download, Edit2 } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useGLTF } from '@react-three/drei';
+import { EffectComposer, Outline, Selection, Select } from '@react-three/postprocessing';
+import * as THREE from 'three';
 
 const DEFAULT_MODEL_PATH = '/model.glb';
 
@@ -24,7 +26,28 @@ function getProxiedModelUrl(taskId: string | undefined, originalUrl: string | un
 
 function HeadModel({ url }: { url: string }) {
   const { scene } = useGLTF(url) as any;
-  return <primitive object={scene} scale={2.5} position={[0, -1, 0]} />;
+  
+  // 遍历并应用卡通材质
+  scene.traverse((child: any) => {
+    if (child.isMesh) {
+      // 保持原有贴图，但切换为 Toon 材质
+      const original = child.material;
+      const toonMaterial = new THREE.MeshToonMaterial({
+        map: original.map,
+        color: original.color,
+        // 可以进一步配置 gradientMap 来强化色阶感
+      });
+      child.material = toonMaterial;
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  return (
+    <Select enabled={true}>
+      <primitive object={scene} scale={2.5} position={[0, -1, 0]} />
+    </Select>
+  );
 }
 
 export default function Preview() {
@@ -79,22 +102,37 @@ export default function Preview() {
           </div>
 
           <div className="relative w-full h-full border-2 border-[var(--charcoal)] bg-white shadow-sm">
-            <Canvas camera={{ position: [0, 0, 4], fov: 50 }}>
-              <ambientLight intensity={1} />
-              <directionalLight position={[5, 5, 5]} intensity={1} />
+            <Canvas camera={{ position: [0, 0, 4], fov: 50 }} shadows>
+              <ambientLight intensity={1.5} />
+              <directionalLight position={[5, 10, 5]} intensity={1.5} castShadow />
+              <pointLight position={[-5, 5, -5]} intensity={0.5} />
+              
               <OrbitControls 
                 autoRotate={autoRotate} 
                 autoRotateSpeed={2} 
                 enableZoom={true} 
               />
-              <Suspense fallback={
-                <mesh>
-                  <boxGeometry args={[1, 1, 1]} />
-                  <meshBasicMaterial color="#708090" />
-                </mesh>
-              }>
-                <HeadModel url={modelUrl} />
-              </Suspense>
+              
+              <Selection>
+                <Suspense fallback={
+                  <mesh>
+                    <boxGeometry args={[1, 1, 1]} />
+                    <meshBasicMaterial color="#708090" />
+                  </mesh>
+                }>
+                  <HeadModel url={modelUrl} />
+                </Suspense>
+
+                <EffectComposer autoClear={false}>
+                  <Outline 
+                    blur 
+                    edgeStrength={2.5} 
+                    width={1000}
+                    visibleEdgeColor={0x000000} 
+                    hiddenEdgeColor={0x000000}
+                  />
+                </EffectComposer>
+              </Selection>
             </Canvas>
           </div>
 

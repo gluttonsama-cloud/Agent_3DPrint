@@ -1,13 +1,12 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, X, Camera, CloudUpload, Loader2 } from 'lucide-react';
-import { uploadPhotos, PhotoFile } from '../services/uploadService';
+import { ArrowLeft, X, Camera, CloudUpload, Sparkles } from 'lucide-react';
+import { PhotoFile } from '../services/uploadService';
 
 export default function Upload() {
   const navigate = useNavigate();
   const [photos, setPhotos] = useState<(string | null)[]>([null, null, null, null]);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
   const [enableBackgroundRemoval, setEnableBackgroundRemoval] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeSlot, setActiveSlot] = useState<number | null>(null);
@@ -69,32 +68,15 @@ export default function Upload() {
   const validPhotoCount = photos.filter(p => p !== null).length;
   const canSubmit = validPhotoCount >= 1;
 
-  const handleUpload = async () => {
-    if (!canSubmit || isUploading) return;
-
-    setIsUploading(true);
-
-    const photoFilesToUpload: PhotoFile[] = photoFiles
-      .filter((f): f is File => f !== undefined && f !== null)
-      .map((file, index) => ({
-        file,
-        view: slots[index]?.label || `角度${index + 1}`,
-      }));
-
-    const result = await uploadPhotos(photoFilesToUpload, enableBackgroundRemoval, 'multiview');
-
-    if (result.success && result.taskId) {
-      navigate('/processing', {
-        state: {
-          taskId: result.taskId,
-          estimatedTime: result.estimatedTime,
-          photoCount: validPhotoCount,
-        },
-      });
-    } else {
-      alert(`上传失败：${result.error || '请重试'}`);
-      setIsUploading(false);
-    }
+  const handleContinue = () => {
+    if (!canSubmit) return;
+    navigate('/anime-preview', {
+      state: {
+        photos,
+        photoFiles,
+        enableBackgroundRemoval
+      }
+    });
   };
 
   return (
@@ -134,6 +116,7 @@ export default function Upload() {
                   className="w-full h-full object-cover" 
                   src={photos[index]!} 
                 />
+                
                 <button 
                   onClick={(e) => removePhoto(index, e)}
                   className="absolute top-2 right-2 bg-white w-6 h-6 flex items-center justify-center border-2 border-[var(--border-charcoal)] text-[var(--text-charcoal)] hover:bg-gray-100"
@@ -160,7 +143,7 @@ export default function Upload() {
         </div>
 
         <div className="mt-auto bg-white border-2 border-[var(--border-charcoal)] p-6 shadow-[6px_6px_0px_var(--border-charcoal)] relative">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-8">
             <div className="flex flex-col">
               <span className="font-bold text-lg text-[var(--text-charcoal)]">开启背景抠图</span>
               <span className="text-xs font-medium text-[var(--text-charcoal)]/60 mt-1">自动去除杂乱背景</span>
@@ -177,21 +160,12 @@ export default function Upload() {
           </div>
 
           <button 
-            onClick={handleUpload}
-            disabled={!canSubmit || isUploading}
+            onClick={handleContinue}
+            disabled={!canSubmit}
             className="w-full h-14 bg-[var(--action-slate)] text-white text-lg font-bold tracking-widest uppercase border-2 border-[var(--border-charcoal)] shadow-[4px_4px_0px_var(--border-charcoal)] flex items-center justify-center gap-3 active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all hover:bg-[#5f6f7f] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-x-0 disabled:active:translate-y-0 disabled:active:shadow-[4px_4px_0px_var(--border-charcoal)]"
           >
-            {isUploading ? (
-              <>
-                <Loader2 className="w-6 h-6 animate-spin" />
-                上传中...
-              </>
-            ) : (
-              <>
-                <CloudUpload className="w-6 h-6" />
-                开始上传生成
-              </>
-            )}
+            <Sparkles className="w-6 h-6" />
+            查看动漫化预览
           </button>
           
           <div className="text-center mt-4">
