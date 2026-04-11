@@ -7,7 +7,8 @@ export default function Upload() {
   const navigate = useNavigate();
   const [photos, setPhotos] = useState<(string | null)[]>([null, null, null, null]);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
-  const [enableBackgroundRemoval, setEnableBackgroundRemoval] = useState(true);
+  const [enableAnimePreview, setEnableAnimePreview] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeSlot, setActiveSlot] = useState<number | null>(null);
 
@@ -18,35 +19,52 @@ export default function Upload() {
     { id: 3, label: '其他角度' },
   ];
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0 && activeSlot !== null) {
-      let currentSlot = activeSlot;
       const filesArray = Array.from(files);
+      let currentSlot = activeSlot;
+      
       const newPhotoFiles = [...photoFiles];
+      const newPhotoDataUrls = [...photos];
 
-      filesArray.forEach((file) => {
+      // 顺序读取文件以保证顺序
+      for (const file of filesArray) {
         if (currentSlot < 4) {
-          const slotToFill = currentSlot;
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setPhotos((prev) => {
-              const newPhotos = [...prev];
-              newPhotos[slotToFill] = reader.result as string;
-              return newPhotos;
-            });
-          };
-          reader.readAsDataURL(file);
-          newPhotoFiles[slotToFill] = file;
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          });
+          newPhotoDataUrls[currentSlot] = dataUrl;
+          newPhotoFiles[currentSlot] = file;
           currentSlot++;
         }
-      });
-      
+      }
+
+      setPhotos(newPhotoDataUrls);
       setPhotoFiles(newPhotoFiles);
     }
     if (e.target) {
       e.target.value = '';
     }
+  };
+
+  const movePhoto = (index: number, direction: 'left' | 'right') => {
+    const newIndex = direction === 'left' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= 4) return;
+
+    setPhotos(prev => {
+      const next = [...prev];
+      [next[index], next[newIndex]] = [next[newIndex], next[index]];
+      return next;
+    });
+
+    setPhotoFiles(prev => {
+      const next = [...prev];
+      [next[index], next[newIndex]] = [next[newIndex], next[index]];
+      return next;
+    });
   };
 
   const triggerUpload = (index: number) => {
@@ -68,15 +86,49 @@ export default function Upload() {
   const validPhotoCount = photos.filter(p => p !== null).length;
   const canSubmit = validPhotoCount >= 1;
 
-  const handleContinue = () => {
-    if (!canSubmit) return;
-    navigate('/anime-preview', {
-      state: {
-        photos,
-        photoFiles,
-        enableBackgroundRemoval
+  const handleContinue = async () => {
+    if (!canSubmit || isUploading) return;
+
+    if (enableAnimePreview) {
+      navigate('/anime-preview', {
+        state: {
+          photos,
+          photoFiles,
+        }
+      });
+    } else {
+      setIsUploading(true);
+      try {
+        const { uploadPhotos } = await import('../services/uploadService');
+        const validPhotos: PhotoFile[] = [];
+        
+        photos.forEach((p, i) => {
+          if (p) {
+            validPhotos.push({
+              file: photoFiles[i],
+              view: slots[i].label
+            });
+          }
+        });
+
+        const result = await uploadPhotos(validPhotos, false);
+        if (result.success && result.taskId) {
+          navigate('/processing', {
+            state: {
+              taskId: result.taskId,
+              estimatedTime: result.estimatedTime
+            }
+          });
+        } else {
+          alert(result.error || '上传失败，请重试');
+        }
+      } catch (err) {
+        console.error('上传出错:', err);
+        alert('无法启动建模任务，请检查网络连接');
+      } finally {
+        setIsUploading(false);
       }
-    });
+    }
   };
 
   return (
@@ -117,12 +169,30 @@ export default function Upload() {
                   src={photos[index]!} 
                 />
                 
-                <button 
-                  onClick={(e) => removePhoto(index, e)}
-                  className="absolute top-2 right-2 bg-white w-6 h-6 flex items-center justify-center border-2 border-[var(--border-charcoal)] text-[var(--text-charcoal)] hover:bg-gray-100"
-                >
-                  <X className="w-4 h-4 font-bold" strokeWidth={3} />
-                </button>
+                <div className="absolute top-1 right-1 flex gap-1">
+                  {index > 0 && (
+                     <button 
+                      onClick={(e) => { e.stopPropagation(); movePhoto(index, 'left'); }}
+                      className="bg-white/90 w-6 h-6 flex items-center justify-center border border-[var(--border-charcoal)] text-[var(--text-charcoal)] hover:bg-white"
+                    >
+                      <ArrowLeft className="w-3 h-3" strokeWidth={3} />
+                    </button>
+                  )}
+                  {index < 3 && (
+                     <button 
+                      onClick={(e) => { e.stopPropagation(); movePhoto(index, 'right'); }}
+                      className="bg-white/90 w-6 h-6 flex items-center justify-center border border-[var(--border-charcoal)] text-[var(--text-charcoal)] hover:bg-white"
+                    >
+                      <ArrowLeft className="w-3 h-3 rotate-180" strokeWidth={3} />
+                    </button>
+                  )}
+                  <button 
+                    onClick={(e) => removePhoto(index, e)}
+                    className="bg-white w-6 h-6 flex items-center justify-center border-2 border-[var(--border-charcoal)] text-[var(--text-charcoal)] hover:bg-gray-100"
+                  >
+                    <X className="w-4 h-4 font-bold" strokeWidth={3} />
+                  </button>
+                </div>
                 {index === 0 && (
                   <div className="absolute bottom-0 left-0 bg-[var(--action-slate)] border-t-2 border-r-2 border-[var(--border-charcoal)] px-3 py-1 text-[10px] font-bold text-white tracking-wider">
                     主视角
@@ -145,15 +215,15 @@ export default function Upload() {
         <div className="mt-auto bg-white border-2 border-[var(--border-charcoal)] p-6 shadow-[6px_6px_0px_var(--border-charcoal)] relative">
           <div className="flex items-center justify-between mb-8">
             <div className="flex flex-col">
-              <span className="font-bold text-lg text-[var(--text-charcoal)]">开启背景抠图</span>
-              <span className="text-xs font-medium text-[var(--text-charcoal)]/60 mt-1">自动去除杂乱背景</span>
+              <span className="font-bold text-lg text-[var(--text-charcoal)]">开启动漫化预览</span>
+              <span className="text-xs font-medium text-[var(--text-charcoal)]/60 mt-1">生成前查看 AI 预览效果</span>
             </div>
             <label className="neo-toggle-wrapper">
               <input 
                 type="checkbox" 
                 className="neo-toggle-input" 
-                checked={enableBackgroundRemoval}
-                onChange={(e) => setEnableBackgroundRemoval(e.target.checked)}
+                checked={enableAnimePreview}
+                onChange={(e) => setEnableAnimePreview(e.target.checked)}
               />
               <span className="neo-toggle-slider"></span>
             </label>
@@ -161,11 +231,13 @@ export default function Upload() {
 
           <button 
             onClick={handleContinue}
-            disabled={!canSubmit}
+            disabled={!canSubmit || isUploading}
             className="w-full h-14 bg-[var(--action-slate)] text-white text-lg font-bold tracking-widest uppercase border-2 border-[var(--border-charcoal)] shadow-[4px_4px_0px_var(--border-charcoal)] flex items-center justify-center gap-3 active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all hover:bg-[#5f6f7f] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-x-0 disabled:active:translate-y-0 disabled:active:shadow-[4px_4px_0px_var(--border-charcoal)]"
           >
-            <Sparkles className="w-6 h-6" />
-            查看动漫化预览
+            {isUploading ? (
+              <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            ) : <Sparkles className="w-6 h-6" />}
+            {isUploading ? '正在上传...' : (enableAnimePreview ? '查看动漫化预览' : '直接启动重塑')}
           </button>
           
           <div className="text-center mt-4">

@@ -194,7 +194,7 @@ async function nativeHttpRequest(
  */
 export async function uploadPhotos(
   photos: PhotoFile[],
-  enableBackgroundRemoval: boolean = true,
+  enableBackgroundRemoval: boolean = false,
   mode: string = 'multiview'
 ): Promise<UploadResponse> {
   try {

@@ -7,7 +7,6 @@ import { uploadPhotos, PhotoFile } from '../services/uploadService';
 interface UploadState {
   photos: (string | null)[];
   photoFiles: File[];
-  enableBackgroundRemoval: boolean;
 }
 
 export default function AnimePreview() {
@@ -71,7 +70,7 @@ export default function AnimePreview() {
       view: index === 0 ? '主视角' : `角度${index + 1}`,
     }));
 
-    const result = await uploadPhotos(photoFilesToUpload, state.enableBackgroundRemoval, 'multiview');
+    const result = await uploadPhotos(photoFilesToUpload, false, 'multiview');
 
     if (result.success && result.taskId) {
       navigate('/processing', {
