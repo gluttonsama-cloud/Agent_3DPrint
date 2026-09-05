@@ -1,0 +1,21 @@
+
+> relief-studio@0.1.0 test:engine
+> node scripts/python.cjs -m unittest discover -s engine/tests -v
+
+test_duplicate_ids_and_non_integer_layers (test_engine.EngineTests.test_duplicate_ids_and_non_integer_layers) ... ok
+test_export_reconstructs_exact_height_and_preserves_holes (test_engine.EngineTests.test_export_reconstructs_exact_height_and_preserves_holes) ... ok
+test_jpeg_noise_and_all_transparent (test_engine.EngineTests.test_jpeg_noise_and_all_transparent) ... ok
+test_large_image_retains_off_stride_single_white_pixel (test_engine.EngineTests.test_large_image_retains_off_stride_single_white_pixel) ... ok
+test_logo_separates_gold_and_white_despite_jpeg_edges (test_engine.EngineTests.test_logo_separates_gold_and_white_despite_jpeg_edges) ... ok
+test_no_overwrite (test_engine.EngineTests.test_no_overwrite) ... ok
+test_recolor_does_not_change_layer_outputs (test_engine.EngineTests.test_recolor_does_not_change_layer_outputs) ... ok
+test_reject_unknown_region_and_invalid_sizes (test_engine.EngineTests.test_reject_unknown_region_and_invalid_sizes) ... ok
+test_segment_keeps_single_pixel_and_disconnected_white (test_engine.EngineTests.test_segment_keeps_single_pixel_and_disconnected_white) ... ok
+test_transparent_pixels_cannot_be_assigned (test_engine.EngineTests.test_transparent_pixels_cannot_be_assigned) ... ok
+test_uniform_image_returns_single_valid_region (test_engine.EngineTests.test_uniform_image_returns_single_valid_region) ... ok
+test_zero_height_export (test_engine.EngineTests.test_zero_height_export) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.591s
+
+OK

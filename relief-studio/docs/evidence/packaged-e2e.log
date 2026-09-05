@@ -1,0 +1,11 @@
+
+> relief-studio@0.1.0 test:e2e
+> playwright test
+
+
+Running 2 tests using 1 worker
+
+  ok 1 tests\desktop.spec.ts:23:5 › 离线桌面：样例编辑、3D、撤销、保存重开、导出 (8.6s)
+  ok 2 tests\desktop.spec.ts:86:5 › 导入、圆形裁剪、分区、画笔擦除与撤销 (3.9s)
+
+  2 passed (13.6s)

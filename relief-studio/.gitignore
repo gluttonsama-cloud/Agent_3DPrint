@@ -1,0 +1,12 @@
+node_modules/
+.venv/
+.sam-venv/
+dist/
+release/
+build/
+engine-dist/
+__pycache__/
+*.spec
+artifacts/
+test-results/
+playwright-report/

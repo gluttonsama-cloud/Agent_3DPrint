@@ -1,0 +1,1 @@
+{"source": "用户会议附件 57480ab26f6d719f3626210b1a75dd2f.jpg", "cropPixels": [105, 24, 410, 410], "ellipseCenter": [204.5, 204.5], "ellipseRadius": 204, "sizeMm": [55, 55], "heightLayers": [0, 5, 10], "sampleSpecificCorrection": {"outerRadiusThreshold": 195, "whiteToGoldPixels": 507}, "humanGroundTruth": false, "notes": "由算法生成的演示分区，尚未取得客户确认的像素级真值与实机高度校准。"}
