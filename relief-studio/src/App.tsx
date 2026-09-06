@@ -1,36 +1,59 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Project, Region } from './types';
+import { RecognitionDialog } from './RecognitionDialog';
+import './recognition.css';
 import { CropDialog } from './CropDialog';
-import { assignSelection, EditorCanvas, type Tool } from './EditorCanvas';
+import { EditorCanvas, type Tool } from './EditorCanvas';
 import { ReliefPreview } from './ReliefPreview';
-import { mergeRegions, projectStats, nextRegionId } from './model';
+import { NameField, NumberField } from './Fields';
+import { mergeRegions, nextRegionId, projectStats } from './model';
+import { regionSelection, type SelectionOperation } from './selection';
 import { loadImage, readRaster } from './image';
 
 function bridge() {
-  if (!window.relief)
-    throw new Error('请在桌面版中使用此功能（npm run desktop）。网页预览仅支持示例编辑。');
+  if (!window.relief) throw new Error('此操作需要桌面版。请在 Relief Studio 中打开工程。');
   return window.relief;
 }
+const tools: { id: Tool; name: string; key: string; icon: string }[] = [
+  { id: 'color', name: '同色选区', key: 'W', icon: '◉' },
+  { id: 'connected', name: '连通选区', key: 'C', icon: '⌖' },
+  { id: 'brush', name: '画笔', key: 'B', icon: '╱' },
+  { id: 'erase', name: '擦除', key: 'E', icon: '▱' },
+  { id: 'hand', name: '平移', key: 'H', icon: '✥' },
+];
 
 export default function App() {
   const [project, setProject] = useState<Project | null>(null);
-  const [history, setHistory] = useState<Project[]>([]);
-  const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState('');
-  const [notice, setNotice] = useState('从一张平面图，开始构建有层次的图案。');
-  const [error, setError] = useState('');
-  const [selected, setSelected] = useState(1);
-  const [tool, setTool] = useState<Tool>('color');
-  const [radius, setRadius] = useState(5);
-  const [selection, setSelection] = useState<number[]>([]);
-  const [mode, setMode] = useState<'color' | 'regions' | 'layer'>('regions');
-  const [view, setView] = useState<'edit' | 'preview'>('edit');
-  const [layer, setLayer] = useState(1);
-  const [colors, setColors] = useState(3);
+  const [past, setPast] = useState<Project[]>([]),
+    [future, setFuture] = useState<Project[]>([]);
+  const saved = useRef<Project | null>(null);
+  const [busy, setBusy] = useState(''),
+    [notice, setNotice] = useState('就绪'),
+    [error, setError] = useState('');
+  const running = useRef(false);
+  const [selected, setSelected] = useState(1),
+    [tool, setTool] = useState<Tool>('color');
+  const [selection, setSelection] = useState<number[]>([]),
+    [operation, setOperation] = useState<SelectionOperation>('replace');
+  const [radius, setRadius] = useState(5),
+    [mode, setMode] = useState<'color' | 'regions' | 'layer'>('regions');
+  const [view, setView] = useState<'edit' | 'preview'>('edit'),
+    [zoom, setZoom] = useState(1);
+  const [layer, setLayer] = useState(1),
+    [target, setTarget] = useState(0);
   const [mergeTarget, setMergeTarget] = useState(0);
   const [crop, setCrop] = useState<{ image: string; name: string } | null>(null);
+  const [recognition, setRecognition] = useState<{
+    image: string;
+    name: string;
+    sizeMm: [number, number];
+    validMask?: number[];
+    replacing: boolean;
+  } | null>(null);
+  const [pending, setPending] = useState<null | (() => void)>(null);
+  const [colorDraft, setColorDraft] = useState('#808080');
   const file = useRef<HTMLInputElement>(null);
-
+  const dirty = !!project && project !== saved.current;
   const counts = useMemo(
     () => (project ? projectStats(project) : new Map<number, number>()),
     [project],
@@ -42,31 +65,31 @@ export default function App() {
       .filter((item) => (counts.get(item.id) || 0) > 0)
       .map((item) => item.layers) || []),
   );
-
+  const currentLayer = Math.min(layer, Math.max(1, maxLayer));
+  useEffect(() => setColorDraft(region?.color || '#808080'), [region?.id, region?.color]);
   useEffect(() => {
-    const beforeUnload = (event: BeforeUnloadEvent) => {
+    const guard = (event: BeforeUnloadEvent) => {
       if (dirty) {
         event.preventDefault();
         event.returnValue = '';
       }
     };
-    window.addEventListener('beforeunload', beforeUnload);
-    return () => window.removeEventListener('beforeunload', beforeUnload);
+    window.addEventListener('beforeunload', guard);
+    return () => window.removeEventListener('beforeunload', guard);
   }, [dirty]);
 
   function edit(next: Project) {
     if (!project) return;
-    // 按像素量限制撤销缓存，避免大图累积占用大量内存。
-    const maxHistory = Math.max(
+    const limit = Math.max(
       1,
       Math.min(20, Math.floor(32_000_000 / (project.width * project.height * 8))),
     );
-    setHistory((previous) => [...previous, project].slice(-maxHistory));
+    setPast((previous) => [...previous, project].slice(-limit));
+    setFuture([]);
     setProject(next);
-    setDirty(true);
   }
   function updateRegion(change: Partial<Region>) {
-    if (project)
+    if (project && region)
       edit({
         ...project,
         regions: project.regions.map((item) =>
@@ -74,7 +97,22 @@ export default function App() {
         ),
       });
   }
+  function replace(next: Project, isNew = false) {
+    saved.current = isNew ? null : next;
+    setProject(next);
+    setPast([]);
+    setFuture([]);
+    setSelection([]);
+    setSelected(next.regions[0].id);
+    setTarget(0);
+    setMergeTarget(0);
+    setView('edit');
+    setZoom(1);
+    setLayer(1);
+  }
   async function run(label: string, action: () => Promise<void>) {
+    if (running.current) return;
+    running.current = true;
     setBusy(label);
     setError('');
     try {
@@ -82,32 +120,26 @@ export default function App() {
     } catch (value) {
       setError(value instanceof Error ? value.message : String(value));
     } finally {
+      running.current = false;
       setBusy('');
     }
   }
-  function mayReplace() {
-    return !dirty || confirm('工程有未保存的修改，是否放弃并继续？');
+  function requestReplace(action: () => void) {
+    if (dirty) setPending(() => action);
+    else action();
   }
-  function replace(next: Project, edited = false) {
-    setProject(next);
-    setHistory([]);
-    setDirty(edited);
-    setSelection([]);
-    setSelected(next.regions[0].id);
-    setView('edit');
-    setLayer(1);
-  }
-  async function sample() {
-    if (!mayReplace()) return;
-    await run('加载样例', async () => {
-      const next: Project = window.relief
-        ? await window.relief.sample()
-        : await fetch('./sample-project.json').then((response) => {
-            if (!response.ok) throw new Error('未找到样例，请先运行样例生成脚本');
-            return response.json();
-          });
-      replace(next);
-      setNotice('55 × 55 mm 徽标样例已载入。白字 10 层、金色 5 层、黑色 0 层。');
+  function sample() {
+    requestReplace(() => {
+      void run('打开示例', async () => {
+        const next: Project = window.relief
+          ? await window.relief.sample()
+          : await fetch('./sample-project.json').then((response) => {
+              if (!response.ok) throw new Error('示例文件不存在。');
+              return response.json();
+            });
+        replace(next);
+        setNotice('示例已打开');
+      });
     });
   }
   async function save() {
@@ -115,569 +147,788 @@ export default function App() {
     await run('保存工程', async () => {
       const result = await bridge().save(project);
       if (result) {
-        setDirty(false);
+        saved.current = project;
         setNotice(`工程已保存：${result.path}`);
       }
     });
   }
-  async function open() {
-    if (!mayReplace()) return;
-    await run('打开工程', async () => {
-      const next = await bridge().open();
-      if (next) {
-        replace(next);
-        setNotice('工程已恢复，分区、原图及高度设置均已载入。');
-      }
+  function open() {
+    requestReplace(() => {
+      void run('打开工程', async () => {
+        const next = await bridge().open();
+        if (next) {
+          replace(next);
+          setNotice('工程已恢复');
+        }
+      });
     });
   }
-  async function importFile(value: File) {
-    await run('读取图像', async () => {
-      const result = await readRaster(value);
-      setCrop({ image: result.image, name: value.name.replace(/\.[^.]+$/, '') });
-      if (result.resized) setNotice('原图较大，已等比例缩至最长边 2048 px；请确认细字清晰度。');
+  function importFile(value: File) {
+    requestReplace(() => {
+      void run('读取图片', async () => {
+        const result = await readRaster(value);
+        setCrop({ image: result.image, name: value.name.replace(/\.[^.]+$/, '') });
+        if (result.resized) setNotice('工作图已等比例缩至最长边 2048 px');
+      });
     });
   }
-  async function finishCrop(image: string) {
-    const name = crop?.name || '未命名图案';
-    await run('自动分区', async () => {
-      const next = await bridge().segment({ image, colors, sizeMm: [55, 55], name });
-      replace(next, true);
-      setCrop(null);
-      setNotice('分区已完成。自动高度仅为建议，请逐区域确认。');
-    });
+  function finishCrop(image: string) {
+    setRecognition({ image, name: crop?.name || '未命名', sizeMm: [55, 55], replacing: false });
+    setCrop(null);
+  }
+  function undo() {
+    if (!project || !past.length) return;
+    const previous = past.at(-1)!;
+    setFuture((items) => [project, ...items]);
+    setProject(previous);
+    setPast(past.slice(0, -1));
+    setSelection([]);
+    if (!previous.regions.some((item) => item.id === selected)) setSelected(previous.regions[0].id);
+  }
+  function redo() {
+    if (!project || !future.length) return;
+    setPast((items) => [...items, project]);
+    setProject(future[0]);
+    setFuture(future.slice(1));
+    setSelection([]);
+    if (!future[0].regions.some((item) => item.id === selected))
+      setSelected(future[0].regions[0].id);
+  }
+  function selectRegion(id: number) {
+    setSelected(id);
+    setMode('regions');
+    setView('edit');
+    setTarget(0);
+    setMergeTarget(0);
+    if (project) setSelection(regionSelection(project.labels, id));
+  }
+  function assign(targetId: number, newRegion = false) {
+    if (!project || !selection.length) return;
+    const labels = project.labels.slice();
+    for (const index of selection) labels[index] = targetId;
+    const regions = newRegion
+      ? [
+          ...project.regions,
+          {
+            id: targetId,
+            name: `区域 ${targetId}`,
+            color: region?.color || '#808080',
+            layers: region?.layers || 0,
+          },
+        ]
+      : project.regions;
+    edit({ ...project, labels, regions });
+    setSelected(targetId);
+    setSelection([]);
+    setTarget(0);
+    setNotice('选区已分配');
+  }
+  function excludeSelection() {
+    if (!project || !selection.length) return;
+    const labels = project.labels.slice();
+    for (const index of selection) labels[index] = 0;
+    edit({ ...project, labels });
+    setSelection([]);
+    setNotice('已从打印范围排除选区');
   }
   async function recolor() {
     if (!project || !region) return;
-    await run('替换图案色', async () => {
-      const image = await loadImage(project.image);
-      const canvas = document.createElement('canvas');
+    await run('应用颜色', async () => {
+      const image = await loadImage(project.image),
+        canvas = document.createElement('canvas');
       canvas.width = project.width;
       canvas.height = project.height;
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(image, 0, 0);
       const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const rgb = [1, 3, 5].map((start) => parseInt(region.color.slice(start, start + 2), 16));
+      const rgb = [1, 3, 5].map((start) => parseInt(colorDraft.slice(start, start + 2), 16));
       project.labels.forEach((id, index) => {
         if (id === selected)
-          rgb.forEach((value, channel) => {
-            pixels.data[index * 4 + channel] = value;
+          rgb.forEach((value, c) => {
+            pixels.data[index * 4 + c] = value;
           });
       });
       ctx.putImageData(pixels, 0, 0);
-      edit({ ...project, image: canvas.toDataURL('image/png') });
-      setNotice('已替换当前区域图案色，堆叠高度保持不变。');
+      edit({
+        ...project,
+        image: canvas.toDataURL('image/png'),
+        regions: project.regions.map((item) =>
+          item.id === selected ? { ...item, color: colorDraft } : item,
+        ),
+      });
+      setNotice('区域颜色已更新');
     });
   }
-  function undo() {
-    const previous = history.at(-1);
-    if (previous) {
-      setProject(previous);
-      setHistory(history.slice(0, -1));
-      setDirty(true);
-      setSelection([]);
-      if (!previous.regions.some((item) => item.id === selected))
-        setSelected(previous.regions[0].id);
-    }
-  }
-
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (busy || crop || pending || recognition) return;
+      const element = event.target as HTMLElement;
+      if (element.closest('input,select,textarea,[contenteditable="true"]')) return;
+      const key = event.key.toLowerCase(),
+        ctrl = event.ctrlKey || event.metaKey;
+      if (ctrl && key === 's') {
+        event.preventDefault();
+        void save();
+      } else if (ctrl && key === 'o') {
+        event.preventDefault();
+        open();
+      } else if (ctrl && key === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+      } else if (ctrl && key === 'y') {
+        event.preventDefault();
+        redo();
+      } else if ((ctrl && key === 'd') || key === 'escape') {
+        event.preventDefault();
+        setSelection([]);
+      } else if (key === 'delete') {
+        event.preventDefault();
+        excludeSelection();
+      } else if (!ctrl) {
+        const found = tools.find((item) => item.key.toLowerCase() === key);
+        if (found) {
+          setTool(found.id);
+          setMode('regions');
+          setView('edit');
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
+  const disabled = !!busy;
   return (
     <div className="app-shell">
       <header className="app-header">
         <div className="brand">
-          <span className="brand-symbol">▱</span>
-          <div>
-            <strong>
-              RELIEF <span>STUDIO</span>
-            </strong>
-            <small>浮雕工坊 / 0.1</small>
-          </div>
+          <span className="brand-symbol" aria-hidden="true">
+            ▱
+          </span>
+          <strong>Relief Studio</strong>
+          <span className="brand-subtitle">浮雕制版</span>
         </div>
-        <div className="header-caption">图案的另一种维度</div>
         <div className="header-actions">
-          <span className="offline-dot">本地运行</span>
-          <button disabled={!!busy} onClick={open}>
+          <button onClick={open} disabled={disabled} title="打开工程 Ctrl+O">
             打开工程
           </button>
-          <button disabled={!project || !!busy} onClick={save}>
-            保存{dirty ? ' ●' : ''}
+          <button onClick={save} disabled={!project || disabled} title="保存工程 Ctrl+S">
+            保存工程
           </button>
           <button
             className="primary"
-            disabled={!project || !!busy}
+            disabled={!project || disabled}
             onClick={() =>
-              run('导出分层文件', async () => {
+              run('导出文件', async () => {
                 const result = await bridge().export(project!);
-                if (result) setNotice(`分层文件已导出：${result.path}（未校准的通用中间文件）`);
+                if (result) setNotice(`分层文件已导出：${result.path}`);
               })
             }
           >
-            导出分层 ↗
+            导出分层
           </button>
         </div>
       </header>
-
-      <div className="workspace-title">
-        <div>
-          <small>YOUR RELIEF WORKSPACE</small>
-          <h1>{project ? project.name : '让平面，生长出层次。'}</h1>
-          <p>
-            {project
-              ? `${project.width} × ${project.height} px · ${project.sizeMm.join(' × ')} mm · ${project.regions.length} 个区域`
-              : '选取图案，定义高度。以可控的分层，制作每一处凹凸。'}
-          </p>
+      <div className="document-bar">
+        <div className="document-name">
+          <span className="file-icon">▤</span>
+          <h1>{project?.name || '未打开工程'}</h1>
+          <span className={`save-state ${dirty ? 'modified' : ''}`}>
+            {project ? (dirty ? '未保存' : '已保存') : ''}
+          </span>
         </div>
-        <div className="workflow">
-          <span className={project ? 'complete' : 'active'}>01 导入图案</span>
-          <i>—</i>
-          <span className={project && view === 'edit' ? 'active' : ''}>02 定义层次</span>
-          <i>—</i>
-          <span className={view === 'preview' ? 'active' : ''}>03 预览与导出</span>
-        </div>
+        {project && (
+          <span className="document-meta">
+            {project.width} × {project.height} px<span>·</span>
+            {project.sizeMm.join(' × ')} mm
+          </span>
+        )}
       </div>
-
       <main className="workspace">
-        <aside className="left-panel panel">
-          <div className="section-heading">
-            <h2>图案与分区</h2>
-            <small>01</small>
-          </div>
-          <button
-            className="import-button"
-            disabled={!!busy}
-            onClick={() => {
-              if (mayReplace()) file.current?.click();
-            }}
-          >
-            <span>＋</span>
-            <strong>导入新图案</strong>
-            <small>PNG / JPEG · 最大 24 MB</small>
-          </button>
-          <input
-            ref={file}
-            type="file"
-            accept="image/png,image/jpeg"
-            hidden
-            onChange={(event) => {
-              const value = event.target.files?.[0];
-              event.target.value = '';
-              if (value) void importFile(value);
-            }}
-          />
-          <div className="field-row">
-            <label htmlFor="colors">自动分区色数</label>
+        <aside className="left-panel sidebar">
+          <section className="sidebar-section">
+            <h2>源图像</h2>
+            <button
+              className="full-button"
+              disabled={disabled}
+              onClick={() => file.current?.click()}
+            >
+              ＋ 导入图片
+            </button>
             <input
-              id="colors"
-              type="number"
-              min="2"
-              max="12"
-              value={colors}
-              onChange={(event) => setColors(Math.max(2, Math.min(12, Number(event.target.value))))}
+              type="file"
+              ref={file}
+              accept="image/png,image/jpeg"
+              hidden
+              onChange={(event) => {
+                const value = event.target.files?.[0];
+                event.target.value = '';
+                if (value) importFile(value);
+              }}
             />
-          </div>
-          <button className="text-button sample-button" disabled={!!busy} onClick={sample}>
-            试用 55 mm 徽标样例 →
-          </button>
+            <button
+              className="full-button"
+              disabled={disabled || !project}
+              onClick={() =>
+                project &&
+                setRecognition({
+                  image: project.image,
+                  name: project.name,
+                  sizeMm: project.sizeMm,
+                  validMask: project.labels.map((id) => (id ? 1 : 0)),
+                  replacing: true,
+                })
+              }
+            >
+              重新识别区域
+            </button>
+            <p className="empty-sidebar">导入后自动识别，可预览并调整</p>
+            <button className="text-button" disabled={disabled} onClick={sample}>
+              打开示例工程
+            </button>
+          </section>
           {project && (
-            <>
-              <div className="divider" />
-              <div className="section-heading">
-                <h3>成品尺寸</h3>
-                <small>mm</small>
-              </div>
+            <section className="sidebar-section">
+              <h2>
+                成品尺寸 <small>mm</small>
+              </h2>
               <div className="size-fields">
-                {['宽度', '高度'].map((name, index) => (
-                  <label key={name}>
-                    {name}
-                    <input
-                      aria-label={name}
-                      type="number"
-                      min="0.1"
-                      max="10000"
-                      step="0.1"
+                {['宽度', '高度'].map((label, index) => (
+                  <label key={label}>
+                    {label}
+                    <NumberField
+                      label={label}
                       value={project.sizeMm[index]}
-                      disabled={!!busy}
-                      onChange={(event) => {
-                        const value = Number(event.target.value);
-                        if (Number.isFinite(value) && value > 0 && value <= 10000) {
-                          const size = [...project.sizeMm] as [number, number];
-                          size[index] = value;
-                          edit({ ...project, sizeMm: size });
-                        }
+                      min={0.1}
+                      max={10000}
+                      step={0.1}
+                      disabled={disabled}
+                      onCommit={(value) => {
+                        const size = [...project.sizeMm] as [number, number];
+                        size[index] = value;
+                        edit({ ...project, sizeMm: size });
                       }}
                     />
                   </label>
                 ))}
               </div>
-              <div className="divider" />
-              <div className="section-heading">
-                <h3>区域列表</h3>
-                <small>{project.regions.length} REGIONS</small>
-              </div>
-              <div className="region-list">
-                {project.regions.map((item) => (
+            </section>
+          )}
+          <section className="regions-section">
+            <div className="section-heading">
+              <h2>区域</h2>
+              <span>{project?.regions.length || 0}</span>
+            </div>
+            <div className="region-list">
+              {project ? (
+                project.regions.map((item) => (
                   <button
                     key={item.id}
-                    className={`region-card ${selected === item.id ? 'selected' : ''}`}
-                    disabled={!!busy}
-                    onClick={() => {
-                      setSelected(item.id);
-                      setMode('regions');
-                    }}
+                    aria-pressed={item.id === selected}
+                    className={`region-card ${item.id === selected ? 'selected' : ''}`}
+                    disabled={disabled}
+                    onClick={() => selectRegion(item.id)}
                   >
                     <span className="swatch" style={{ background: item.color }} />
                     <span className="region-text">
                       <strong>{item.name}</strong>
                       <small>
                         {(((counts.get(item.id) || 0) / project.labels.length) * 100).toFixed(1)}%
-                        画布
                       </small>
                     </span>
                     <span className="region-height">
                       {item.layers}
-                      <small>层</small>
+                      <small> 层</small>
                     </span>
                   </button>
-                ))}
+                ))
+              ) : (
+                <p className="empty-sidebar">导入图片后显示区域</p>
+              )}
+            </div>
+            {project && (
+              <div className="region-list-footer">
+                <button
+                  className="text-button"
+                  disabled={disabled || project.regions.length >= 32}
+                  onClick={() => {
+                    const id = nextRegionId(project.regions);
+                    edit({
+                      ...project,
+                      regions: [
+                        ...project.regions,
+                        { id, name: `区域 ${id}`, color: '#808080', layers: 0 },
+                      ],
+                    });
+                    setSelected(id);
+                    setSelection([]);
+                  }}
+                >
+                  ＋ 新建区域
+                </button>
+                <span className="excluded-note">
+                  非打印区 {(((counts.get(0) || 0) / project.labels.length) * 100).toFixed(1)}%
+                </span>
               </div>
-              <div className="excluded-note">
-                <span className="checker mini" />
-                不打印区域 · {(((counts.get(0) || 0) / project.labels.length) * 100).toFixed(1)}%
-              </div>
-              <button
-                className="text-button"
-                disabled={!!busy || project.regions.length >= 32}
-                onClick={() => {
-                  const id = nextRegionId(project.regions);
-                  edit({
-                    ...project,
-                    regions: [
-                      ...project.regions,
-                      { id, name: `新区域 ${id}`, color: '#bf9463', layers: 5 },
-                    ],
-                  });
-                  setSelected(id);
-                }}
-              >
-                ＋ 新建区域
-              </button>
-            </>
-          )}
-          <div className="panel-bottom">
-            <span>●</span> 颜色与高度分别设置
-            <br />
-            <small>图案色不决定实际凹凸。</small>
-          </div>
+            )}
+          </section>
         </aside>
-
-        <section className="center-panel panel">
+        <section className="center-panel">
           <div className="canvas-toolbar">
-            <div className="segmented">
-              <button className={view === 'edit' ? 'active' : ''} onClick={() => setView('edit')}>
+            <div className="view-tabs">
+              <button
+                className={view === 'edit' ? 'active' : ''}
+                aria-pressed={view === 'edit'}
+                onClick={() => setView('edit')}
+              >
                 平面编辑
               </button>
               <button
                 className={view === 'preview' ? 'active' : ''}
+                aria-pressed={view === 'preview'}
                 disabled={!project}
                 onClick={() => setView('preview')}
               >
                 3D 浮雕
               </button>
             </div>
-            <button className="undo-button" disabled={!history.length || !!busy} onClick={undo}>
-              ↶ 撤销
-            </button>
+            <div className="history-buttons">
+              <button
+                aria-label="撤销"
+                title="撤销 Ctrl+Z"
+                disabled={!past.length || disabled}
+                onClick={undo}
+              >
+                ↶
+              </button>
+              <button
+                aria-label="重做"
+                title="重做 Ctrl+Shift+Z"
+                disabled={!future.length || disabled}
+                onClick={redo}
+              >
+                ↷
+              </button>
+            </div>
           </div>
           {!project ? (
             <div className="empty-stage">
-              <div className="relief-illustration">
-                <div />
-                <div />
-                <div />
-                <div>R</div>
-              </div>
-              <small>FROM IMAGE TO RELIEF</small>
-              <h2>一张图案，多层可能</h2>
-              <p>
-                先从标志、文字或清晰的色块图开始。
-                <br />
-                每个区域的高度，都由你决定。
-              </p>
-              <button className="primary" disabled={!!busy} onClick={sample}>
-                载入演示图案 →
+              <span className="empty-file-icon" aria-hidden="true">
+                ▧
+              </span>
+              <h2>导入图片</h2>
+              <p>选择 PNG 或 JPEG 文件开始制版</p>
+              <button className="primary" onClick={() => file.current?.click()} disabled={disabled}>
+                选择文件
               </button>
-              <span className="empty-caption">离线处理 / 人工可控 / 分层导出</span>
+              <button className="text-button" onClick={sample} disabled={disabled}>
+                打开 55 mm 徽标示例
+              </button>
+              <small>支持 PNG、JPEG · 最大 24 MB</small>
             </div>
           ) : view === 'preview' ? (
             <ReliefPreview project={project} />
           ) : (
             <>
               <div className="edit-tools">
-                {(
-                  [
-                    ['color', '◉', '同色选区'],
-                    ['connected', '⌘', '连通选区'],
-                    ['brush', '╱', '画笔'],
-                    ['erase', '▱', '擦除'],
-                  ] as const
-                ).map(([id, icon, label]) => (
+                {tools.map((item) => (
                   <button
-                    key={id}
-                    disabled={!!busy}
-                    title={label}
-                    aria-label={label}
-                    className={tool === id ? 'active' : ''}
-                    onClick={() => setTool(id)}
+                    key={item.id}
+                    aria-label={item.name}
+                    aria-pressed={tool === item.id}
+                    title={`${item.name} (${item.key})`}
+                    className={tool === item.id ? 'active' : ''}
+                    disabled={disabled}
+                    onClick={() => {
+                      setTool(item.id);
+                      setMode('regions');
+                    }}
                   >
-                    <span aria-hidden="true">{icon}</span>
-                    <span>{label}</span>
+                    <span aria-hidden="true">{item.icon}</span>
+                    {item.name}
                   </button>
                 ))}
-                {(tool === 'brush' || tool === 'erase') && (
-                  <label className="brush-size">
-                    半径{' '}
-                    <input
-                      type="range"
-                      min="1"
-                      max="30"
-                      value={radius}
-                      onChange={(event) => setRadius(Number(event.target.value))}
-                    />
-                    {radius}px
-                  </label>
+              </div>
+              <div className="tool-options">
+                {tool === 'color' || tool === 'connected' ? (
+                  <>
+                    <label>
+                      选取方式
+                      <select
+                        aria-label="选取方式"
+                        value={operation}
+                        disabled={disabled}
+                        onChange={(event) => setOperation(event.target.value as SelectionOperation)}
+                      >
+                        <option value="replace">新选区</option>
+                        <option value="add">添加到选区</option>
+                        <option value="subtract">从选区减去</option>
+                      </select>
+                    </label>
+                    <span className="tool-description">
+                      {tool === 'color' ? '选取同一分区的所有像素' : '仅选取相邻的同区像素'}
+                    </span>
+                  </>
+                ) : tool === 'hand' ? (
+                  <span>拖动画布平移；滚动查看放大后的图像</span>
+                ) : (
+                  <>
+                    {tool === 'brush' && (
+                      <label>
+                        绘入区域
+                        <select
+                          aria-label="绘入区域"
+                          value={selected}
+                          onChange={(event) => setSelected(Number(event.target.value))}
+                        >
+                          {project.regions.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <label>
+                      笔刷半径{' '}
+                      <input
+                        aria-label="笔刷半径"
+                        type="range"
+                        min={1}
+                        max={40}
+                        value={radius}
+                        onChange={(event) => setRadius(Number(event.target.value))}
+                      />
+                      <span>{radius} px</span>
+                    </label>
+                    <span className="tool-description">
+                      {selection.length
+                        ? '仅作用于选区'
+                        : tool === 'brush'
+                          ? `绘入「${region?.name}」`
+                          : '从打印范围擦除'}
+                    </span>
+                  </>
                 )}
               </div>
-              <div className="art-stage checker" style={{ pointerEvents: busy ? 'none' : 'auto' }}>
+              <div className="art-stage" style={{ pointerEvents: disabled ? 'none' : 'auto' }}>
                 <EditorCanvas
                   project={project}
                   selected={selected}
                   tool={tool}
                   radius={radius}
                   mode={mode}
-                  layer={Math.min(layer, Math.max(1, maxLayer))}
+                  layer={currentLayer}
+                  zoom={zoom}
+                  operation={operation}
                   selection={selection}
                   onSelect={setSelected}
-                  onSelection={setSelection}
-                  onPaint={(labels) => edit({ ...project, labels })}
+                  onSelection={(indices) => {
+                    setSelection(indices);
+                    setMode('regions');
+                    setTarget(0);
+                  }}
+                  onPaint={(labels) => {
+                    edit({ ...project, labels });
+                    setNotice('区域已更新');
+                  }}
+                  onError={setError}
                 />
-                <span className="dimension dimension-x">{project.sizeMm[0]} mm</span>
+              </div>
+              <div className="selection-bar">
+                <span data-testid="selection-count" data-count={selection.length}>
+                  {selection.length
+                    ? `已选 ${selection.length.toLocaleString()} 像素`
+                    : '未选择像素'}
+                </span>
+                <button
+                  disabled={!selection.length || disabled}
+                  onClick={() => setSelection([])}
+                  title="Ctrl+D / Esc"
+                >
+                  取消选区
+                </button>
               </div>
               <div className="canvas-bottom">
-                <div className="segmented small">
+                <div className="segmented">
                   {(
                     [
                       ['color', '原图'],
-                      ['regions', '分区'],
+                      ['regions', '选区'],
                       ['layer', '逐层'],
                     ] as const
                   ).map(([id, label]) => (
                     <button
                       key={id}
                       className={mode === id ? 'active' : ''}
+                      aria-pressed={mode === id}
                       onClick={() => setMode(id)}
                     >
                       {label}
                     </button>
                   ))}
                 </div>
-                {mode === 'layer' ? (
-                  <label className="layer-slider">
-                    第{' '}
-                    <input
-                      type="range"
-                      min="1"
-                      max={Math.max(1, maxLayer)}
-                      value={Math.min(layer, Math.max(1, maxLayer))}
-                      onChange={(event) => setLayer(Number(event.target.value))}
-                    />
-                    {Math.min(layer, Math.max(1, maxLayer))} / {maxLayer} 层
-                  </label>
-                ) : (
-                  <small>棋盘格 = 不打印 · 选区高亮不改变图案</small>
-                )}
-              </div>
-            </>
-          )}
-          <div className="canvas-caption">
-            <span>◈</span> 高度未校准 · 预览不代表实际毫米厚度或金属效果
-          </div>
-        </section>
-
-        <aside className="right-panel panel">
-          <div className="section-heading">
-            <h2>定义高度</h2>
-            <small>02</small>
-          </div>
-          {region && project ? (
-            <>
-              <div className="current-region">
-                <span className="swatch large" style={{ background: region.color }} />
-                <div>
-                  <small>CURRENT REGION</small>
-                  <input
-                    aria-label="区域名称"
-                    value={region.name}
-                    maxLength={100}
-                    disabled={!!busy}
-                    onChange={(event) => updateRegion({ name: event.target.value })}
-                  />
+                <div className="zoom-controls">
+                  <button
+                    aria-label="缩小"
+                    disabled={zoom <= 0.5}
+                    onClick={() => setZoom(Math.max(0.5, zoom / 1.25))}
+                  >
+                    −
+                  </button>
+                  <button onClick={() => setZoom(1)} title="恢复适合窗口">
+                    {zoom === 1 ? '适合窗口' : `${Math.round(zoom * 100)}%`}
+                  </button>
+                  <button
+                    aria-label="放大"
+                    disabled={zoom >= 8}
+                    onClick={() => setZoom(Math.min(8, zoom * 1.25))}
+                  >
+                    ＋
+                  </button>
                 </div>
               </div>
-              <label className="height-label" htmlFor="height">
-                白墨堆叠示意
-              </label>
-              <div className="height-number">
-                <input
-                  id="height"
-                  aria-label="区域层数"
-                  type="number"
-                  min="0"
-                  max="256"
-                  value={region.layers}
-                  disabled={!!busy}
-                  onChange={(event) => {
-                    const layers = Number(event.target.value);
-                    if (Number.isInteger(layers) && layers >= 0 && layers <= 256)
-                      updateRegion({ layers });
-                  }}
-                />
-                <span>层</span>
-              </div>
-              <input
-                className="height-range"
-                aria-label="层数滑块"
-                type="range"
-                min="0"
-                max="30"
-                value={Math.min(30, region.layers)}
-                disabled={!!busy}
-                onChange={(event) => updateRegion({ layers: Number(event.target.value) })}
-              />
-              <div className="range-labels">
-                <span>平整 / 0</span>
-                <span>凸起 / 30</span>
-              </div>
-              <div className="height-presets">
-                {[0, 5, 10].map((value) => (
-                  <button
-                    key={value}
-                    disabled={!!busy}
-                    onClick={() => updateRegion({ layers: value })}
-                  >
-                    {value} 层
-                  </button>
-                ))}
-              </div>
-              <p className="hint">层数代表累计沉积次数。0 层保留图案颜色，仅不生成堆叠掩膜。</p>
-              <div className="divider" />
-              <h3>区域操作</h3>
-              <label className="field-row">
-                区域颜色
-                <input
-                  aria-label="区域颜色"
-                  type="color"
-                  value={region.color}
-                  disabled={!!busy}
-                  onChange={(event) => updateRegion({ color: event.target.value })}
-                />
-              </label>
-              <button className="full-button" disabled={!!busy} onClick={recolor}>
-                将此颜色应用到图案
-              </button>
-              <p className="hint">更改色标后点击应用，才会替换原图颜色。</p>
-              {selection.length > 0 && (
-                <div className="selection-box">
-                  <strong>已选 {selection.length} 个像素</strong>
-                  <button
-                    disabled={!!busy}
-                    onClick={() =>
-                      run('应用选区', async () => {
-                        const labels = await assignSelection(project, selection, selected);
-                        edit({ ...project, labels });
-                        setSelection([]);
-                      })
-                    }
-                  >
-                    划入当前区域
-                  </button>
-                  <button onClick={() => setSelection([])}>取消选择</button>
+              {mode === 'layer' && (
+                <div className="layer-control">
+                  {maxLayer ? (
+                    <>
+                      <span>
+                        第 {currentLayer} / {maxLayer} 层
+                      </span>
+                      <input
+                        aria-label="查看层"
+                        type="range"
+                        min={1}
+                        max={maxLayer}
+                        value={currentLayer}
+                        onChange={(event) => setLayer(Number(event.target.value))}
+                      />
+                    </>
+                  ) : (
+                    <span>当前工程没有堆叠层</span>
+                  )}
                 </div>
               )}
-              <label className="stack-field">
-                将当前区域合并到
-                <select
-                  aria-label="合并目标"
-                  disabled={!!busy}
-                  value={mergeTarget}
-                  onChange={(event) => setMergeTarget(Number(event.target.value))}
-                >
-                  <option value="0">选择目标区域</option>
-                  {project.regions
-                    .filter((item) => item.id !== selected)
-                    .map((item) => (
+            </>
+          )}
+        </section>
+        <aside className="right-panel sidebar">
+          <div className="properties-scroll">
+            <section className="sidebar-section">
+              <h2>区域属性</h2>
+              {project && region ? (
+                <>
+                  <label className="stack-field">
+                    名称
+                    <NameField
+                      value={region.name}
+                      disabled={disabled}
+                      onCommit={(name) => updateRegion({ name })}
+                    />
+                  </label>
+                  <div className="field-row">
+                    <label>堆叠层数</label>
+                    <div className="stepper">
+                      <button
+                        aria-label="减少层数"
+                        disabled={disabled || region.layers === 0}
+                        onClick={() => updateRegion({ layers: region.layers - 1 })}
+                      >
+                        −
+                      </button>
+                      <NumberField
+                        label="区域层数"
+                        value={region.layers}
+                        disabled={disabled}
+                        onCommit={(layers) => updateRegion({ layers })}
+                      />
+                      <button
+                        aria-label="增加层数"
+                        disabled={disabled || region.layers === 256}
+                        onClick={() => updateRegion({ layers: region.layers + 1 })}
+                      >
+                        ＋
+                      </button>
+                    </div>
+                  </div>
+                  <div className="height-presets">
+                    {[0, 5, 10, 20].map((value) => (
+                      <button
+                        key={value}
+                        disabled={disabled}
+                        onClick={() => updateRegion({ layers: value })}
+                      >
+                        {value} 层
+                      </button>
+                    ))}
+                  </div>
+                  <div className="field-row">
+                    <label htmlFor="region-color">图案颜色</label>
+                    <div className="color-control">
+                      <input
+                        id="region-color"
+                        aria-label="区域颜色"
+                        type="color"
+                        value={colorDraft}
+                        disabled={disabled}
+                        onChange={(event) => setColorDraft(event.target.value)}
+                      />
+                      <span>{colorDraft.toUpperCase()}</span>
+                    </div>
+                  </div>
+                  <button
+                    className="full-button"
+                    disabled={disabled || colorDraft === region.color}
+                    onClick={recolor}
+                  >
+                    应用颜色到区域
+                  </button>
+                </>
+              ) : (
+                <p className="empty-sidebar">选择区域以编辑属性</p>
+              )}
+            </section>
+            {project && (
+              <section className="sidebar-section selection-properties">
+                <h2>
+                  选区操作{' '}
+                  <small>
+                    {selection.length ? `${selection.length.toLocaleString()} px` : '无选区'}
+                  </small>
+                </h2>
+                <label className="stack-field">
+                  分配到区域
+                  <select
+                    aria-label="分配目标"
+                    disabled={disabled || !selection.length}
+                    value={target}
+                    onChange={(event) => setTarget(Number(event.target.value))}
+                  >
+                    <option value={0}>选择目标区域</option>
+                    {project.regions.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.name} · {item.layers} 层
                       </option>
                     ))}
-                </select>
-              </label>
-              <button
-                className="full-button"
-                disabled={
-                  !!busy ||
-                  !mergeTarget ||
-                  mergeTarget === selected ||
-                  !project.regions.some((item) => item.id === mergeTarget)
-                }
-                onClick={() => {
-                  edit({
-                    ...project,
-                    labels: mergeRegions(project.labels, selected, mergeTarget),
-                    regions: project.regions.filter((item) => item.id !== selected),
-                  });
-                  setSelected(mergeTarget);
-                  setMergeTarget(0);
-                  setSelection([]);
-                }}
-              >
-                合并区域
-              </button>
-            </>
-          ) : (
-            <div className="right-empty">
-              <span>↖</span>
-              <p>
-                导入图案后，
-                <br />
-                选择区域来设置高度。
-              </p>
-            </div>
-          )}
-          <div className="export-summary">
-            <small>OUTPUT SUMMARY</small>
-            <h3>为每一层，准备就绪</h3>
-            <div>
-              <span>累计堆叠掩膜</span>
-              <strong>
-                {maxLayer}
-                <small> 层</small>
-              </strong>
-            </div>
-            <div>
-              <span>高度数据</span>
-              <strong>16 bit</strong>
-            </div>
-            <div>
-              <span>工艺状态</span>
-              <span className="badge">待实机校准</span>
-            </div>
-            <p>输出工程、彩色图、高度图、区域掩膜和分层说明。须完成 RIP 适配后再用于打印。</p>
+                  </select>
+                </label>
+                <button
+                  className="full-button"
+                  disabled={disabled || !selection.length || !target}
+                  onClick={() => assign(target)}
+                >
+                  应用分配
+                </button>
+                <button
+                  className="full-button"
+                  disabled={disabled || !selection.length || project.regions.length >= 32}
+                  onClick={() => assign(nextRegionId(project.regions), true)}
+                >
+                  选区建立新区域
+                </button>
+                <button
+                  className="text-button danger"
+                  disabled={disabled || !selection.length}
+                  onClick={excludeSelection}
+                >
+                  排除选区 <kbd>Delete</kbd>
+                </button>
+              </section>
+            )}
+            {project && region && (
+              <section className="sidebar-section">
+                <h2>合并区域</h2>
+                <label className="stack-field">
+                  将「{region.name}」合并到
+                  <select
+                    aria-label="合并目标"
+                    value={mergeTarget}
+                    disabled={disabled}
+                    onChange={(event) => setMergeTarget(Number(event.target.value))}
+                  >
+                    <option value={0}>选择目标区域</option>
+                    {project.regions
+                      .filter((item) => item.id !== selected)
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} · {item.layers} 层
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <button
+                  className="full-button"
+                  disabled={
+                    disabled ||
+                    !mergeTarget ||
+                    mergeTarget === selected ||
+                    !project.regions.some((item) => item.id === mergeTarget)
+                  }
+                  onClick={() => {
+                    edit({
+                      ...project,
+                      labels: mergeRegions(project.labels, selected, mergeTarget),
+                      regions: project.regions.filter((item) => item.id !== selected),
+                    });
+                    setSelected(mergeTarget);
+                    setSelection([]);
+                    setTarget(0);
+                    setMergeTarget(0);
+                    setNotice('区域已合并');
+                  }}
+                >
+                  合并整个区域
+                </button>
+              </section>
+            )}
           </div>
+          <section className="output-summary">
+            <h2>输出</h2>
+            <div>
+              <span>分层数量</span>
+              <strong>{maxLayer} 层</strong>
+            </div>
+            <div>
+              <span>高度图</span>
+              <strong>16 位 PNG</strong>
+            </div>
+            <div>
+              <span>成品尺寸</span>
+              <strong>{project ? project.sizeMm.join(' × ') + ' mm' : '—'}</strong>
+            </div>
+          </section>
         </aside>
       </main>
       <footer className={`statusbar ${error ? 'has-error' : ''}`} role={error ? 'alert' : 'status'}>
-        <span>{busy ? `◌ ${busy}…` : error ? `! ${error}` : `✓ ${notice}`}</span>
-        <small>LOGO / TYPE / COLOR BLOCKS</small>
+        <span title={error || notice}>{busy ? `${busy}…` : error || notice}</span>
+        <span>
+          {view === 'edit' && project
+            ? `${tools.find((item) => item.id === tool)?.name} · ${tool === 'color' || tool === 'connected' ? 'Shift 追加 / Alt 减选' : 'Ctrl+Z 撤销'}`
+            : 'Relief Studio'}
+        </span>
+        {error && (
+          <button aria-label="关闭错误提示" onClick={() => setError('')}>
+            ×
+          </button>
+        )}
       </footer>
+      {recognition && (
+        <RecognitionDialog
+          {...recognition}
+          onCancel={() => setRecognition(null)}
+          onApply={(next) => {
+            if (recognition.replacing && project) {
+              edit(next);
+              setSelection([]);
+              setSelected(next.regions[0].id);
+              setTarget(0);
+              setMergeTarget(0);
+            } else replace(next, true);
+            setRecognition(null);
+            setNotice('分区已完成');
+          }}
+        />
+      )}
       {crop && (
         <CropDialog
           image={crop.image}
@@ -688,6 +939,34 @@ export default function App() {
             if (!busy) void finishCrop(image);
           }}
         />
+      )}
+      {pending && (
+        <div className="modal-backdrop">
+          <section
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="未保存更改"
+          >
+            <h2>当前工程尚未保存</h2>
+            <p>继续打开其他文件将放弃当前更改。</p>
+            <div>
+              <button autoFocus onClick={() => setPending(null)}>
+                继续编辑
+              </button>
+              <button
+                className="primary"
+                onClick={() => {
+                  const action = pending;
+                  setPending(null);
+                  action();
+                }}
+              >
+                放弃更改并继续
+              </button>
+            </div>
+          </section>
+        </div>
       )}
       {busy && (
         <div className="busy-indicator" aria-live="polite">

@@ -103,55 +103,32 @@ def validate_project(project):
 
 def segment(job):
   rgba = decode_image(job.get('image'))
-  colors = integer(job.get('colors', 3), 2, 12, '分区颜色数')
+  from color_partition import partition
+  requested = job.get('colors', 'auto')
+  colors = None if requested == 'auto' else integer(requested, 1, 12, '分区颜色数')
+  tolerance = job.get('tolerance', 12)
+  if type(tolerance) not in (int, float) or not math.isfinite(tolerance) or not 1 <= tolerance <= 50:
+    raise ValueError('颜色容差必须为 1 至 50')
   size = job.get('sizeMm', [55, 55])
   physical_size(size)
   visible = rgba[:, :, 3] > 0
+  valid = job.get('validMask')
+  if valid is not None:
+    if not isinstance(valid, list) or len(valid) != visible.size or any(type(v) is not int or v not in (0, 1) for v in valid):
+      raise ValueError('有效范围无效')
+    visible &= np.array(valid, dtype=bool).reshape(visible.shape)
   rgb = rgba[:, :, :3][visible]
   if not len(rgb):
     raise ValueError('图片没有可打印像素')
-  # 全图 5-bit RGB 直方图，每个非空色箱参与训练，避免步长抽样漏掉细笔画。
-  bins = (rgb[:,0].astype(np.int32)//8)*1024 + (rgb[:,1].astype(np.int32)//8)*32 + rgb[:,2]//8
-  counts = np.bincount(bins, minlength=32768)
-  occupied = counts > 0
-  sampled = np.stack([np.bincount(bins, weights=rgb[:,channel], minlength=32768)[occupied]
-                       / counts[occupied] for channel in range(3)], axis=1).astype(np.float32)
-  colors = min(colors, len(sampled))
-  cv2.setRNGSeed(42)
-  cv2.setNumThreads(1)
-  weights = counts[occupied].astype(np.float64)
-  centers = [sampled[weights.argmax()]]
-  # 最远色初始化覆盖少量高对比文字；加权更新防止 JPEG 稀有杂色主导中心。
-  while len(centers) < colors:
-    distances = ((sampled[:,None,:]-np.array(centers)[None,:,:])**2).sum(axis=2).min(axis=1)
-    centers.append(sampled[(distances * weights).argmax()])
-  centers = np.array(centers,dtype=np.float32)
-  for _ in range(40):
-    assignments = ((sampled[:,None,:]-centers[None,:,:])**2).sum(axis=2).argmin(axis=1)
-    updated = centers.copy()
-    for index in range(colors):
-      members = assignments == index
-      if members.any():
-        updated[index] = np.average(sampled[members],axis=0,weights=weights[members])
-    converged = np.max(np.abs(updated-centers)) < 0.2
-    centers = updated
-    if converged:
-      break
-  luminance = centers @ np.array([0.2126, 0.7152, 0.0722])
-  centers = centers[np.argsort(luminance)]
-  flat_labels = np.empty(len(rgb), dtype=np.uint16)
-  for start in range(0, len(rgb), 65536):
-    pixels = rgb[start:start+65536].astype(np.float32)
-    distances = ((pixels[:, None, :] - centers[None, :, :]) ** 2).sum(axis=2)
-    flat_labels[start:start+len(pixels)] = distances.argmin(axis=1) + 1
+  kernel = np.ones((3, 3), dtype=np.uint8)
+  spread = cv2.dilate(rgba[:, :, :3], kernel).astype(np.int16)-cv2.erode(rgba[:, :, :3], kernel)
+  interior = (spread.max(axis=2) <= 12)[visible]
+  flat_labels, centers = partition(rgb, colors, tolerance, interior)
   labels = np.zeros(visible.shape, dtype=np.uint16)
   labels[visible] = flat_labels
-  regions = []
-  for index, center in enumerate(centers):
-    layers = round(index / max(1, colors-1) * 10)
-    regions.append({'id': index+1, 'name': f'区域 {index+1}',
-                    'color': '#' + ''.join(f'{int(round(c)):02x}' for c in center),
-                    'layers': layers})
+  regions = [{'id': index+1, 'name': f'区域 {index+1}',
+              'color': '#' + ''.join(f'{int(c):02x}' for c in center), 'layers': 0}
+             for index, center in enumerate(centers)]
   project = {'version': 1, 'name': str(job.get('name', '未命名工程'))[:200],
              'width': rgba.shape[1], 'height': rgba.shape[0], 'sizeMm': size,
              'image': encode_image(rgba), 'labels': labels.ravel().tolist(), 'regions': regions}

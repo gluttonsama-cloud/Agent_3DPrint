@@ -9,6 +9,10 @@ const root = path.resolve(__dirname, '..');
 const indexPath = path.join(root, 'dist', 'index.html');
 let mainWindow;
 let busy = false;
+let segmentChild, segmentTask;
+let segmentCanceled = false;
+const subject = require('./subject.cjs')(app, root);
+app.on('before-quit', () => subject.stop());
 
 function engineCommand() {
   return app.isPackaged
@@ -25,12 +29,14 @@ async function runEngine(job, destination) {
     const output = destination || path.join(temp, 'result');
     await fs.writeFile(jobPath, serialized, 'utf8');
     const [command, args] = engineCommand();
+    if (job.action === 'segment' && segmentCanceled) throw new Error('识别已取消');
     const result = await new Promise((resolve, reject) => {
       const child = spawn(command, [...args, '--job', jobPath, '--out', output], {
         windowsHide: true,
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
+      if (job.action === 'segment') segmentChild = child;
       let stdout = '';
       let stderr = '';
       const timer = setTimeout(() => {
@@ -48,6 +54,7 @@ async function runEngine(job, destination) {
         reject(error);
       });
       child.on('close', (code) => {
+        if (segmentChild === child) segmentChild = null;
         clearTimeout(timer);
         try {
           const response = JSON.parse(stdout.trim());
@@ -67,7 +74,7 @@ async function runEngine(job, destination) {
   }
 }
 
-function handle(name, action) {
+function handle(name, action, concurrent = false) {
   ipcMain.handle(name, async (event, value) => {
     if (
       event.sender !== mainWindow.webContents ||
@@ -76,6 +83,7 @@ function handle(name, action) {
     ) {
       throw new Error('不允许的调用来源');
     }
+    if (concurrent) return action(value);
     if (busy) throw new Error('正在处理上一项任务');
     busy = true;
     try {
@@ -91,6 +99,18 @@ async function chooseSave(defaultPath, filters) {
 }
 
 function registerHandlers() {
+  handle(
+    'relief:segment-cancel',
+    async () => {
+      segmentCanceled = true;
+      segmentChild?.kill();
+      await segmentTask?.catch(() => {});
+    },
+    true,
+  );
+  handle('relief:subject', (input) => subject.request(input));
+  handle('relief:subject-status', () => subject.status(), true);
+  handle('relief:subject-cancel', () => subject.stop(), true);
   handle('relief:info', () => ({ version: app.getVersion(), platform: process.platform }));
   handle('relief:sample', async () => {
     const samples = app.isPackaged
@@ -98,7 +118,16 @@ function registerHandlers() {
       : path.join(root, 'samples');
     return JSON.parse(await fs.readFile(path.join(samples, 'sample-project.json'), 'utf8'));
   });
-  handle('relief:segment', (input) => runEngine({ ...input, action: 'segment' }));
+  handle('relief:segment', async (input) => {
+    segmentCanceled = false;
+    segmentTask = runEngine({ ...input, action: 'segment' });
+    try {
+      return await segmentTask;
+    } finally {
+      segmentTask = null;
+      segmentChild = null;
+    }
+  });
   handle('relief:save', async (project) => {
     await runEngine({ action: 'validate', project });
     const result = await chooseSave('浮雕工程.relief.json', [
@@ -158,7 +187,7 @@ app.whenReady().then(() => {
     minWidth: 1080,
     minHeight: 720,
     backgroundColor: '#f4f2ed',
-    title: 'Relief Studio · 浮雕工坊',
+    title: 'Relief Studio · 浮雕制版',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,

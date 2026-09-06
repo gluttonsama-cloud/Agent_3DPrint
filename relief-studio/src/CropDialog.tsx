@@ -71,14 +71,13 @@ export function CropDialog({ image, onCancel, onConfirm }: Props) {
       <section className="modal" role="dialog" aria-modal="true" aria-label="裁剪图片">
         <div className="section-heading">
           <div>
-            <small>01 / PREPARE</small>
-            <h2>框选你的图案</h2>
+            <h2>裁剪图片</h2>
           </div>
           <button onClick={onCancel} aria-label="取消裁剪">
             ✕
           </button>
         </div>
-        <p className="muted">拖动框选，排除说明文字与外部背景。圆形标志可启用椭圆裁切。</p>
+        <p className="muted">拖动框选需要保留的范围</p>
         <div className="crop-stage" style={{ aspectRatio: `${width}/${height}` }}>
           <canvas
             ref={canvas}
@@ -122,7 +121,7 @@ export function CropDialog({ image, onCancel, onConfirm }: Props) {
             椭圆裁切，外部不打印
           </label>
           <button className="primary" disabled={!ready || !rect[2] || !rect[3]} onClick={confirm}>
-            确认裁剪并分区 →
+            应用裁剪
           </button>
         </div>
       </section>

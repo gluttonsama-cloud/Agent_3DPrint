@@ -25,7 +25,7 @@ export function ReliefPreview({ project }: { project: Project }) {
     }
     setError('');
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setClearColor(0xeceee9, 1);
+    renderer.setClearColor(0xefefe8, 1);
     host.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 1000);
@@ -192,9 +192,7 @@ export function ReliefPreview({ project }: { project: Project }) {
   return (
     <div className="preview-wrap">
       <div className="preview-host" ref={container} />
-      <span className="preview-hint">
-        {error || '拖动旋转 · 滚轮缩放 · 原分辨率几何 · Z 向为示意比例'}
-      </span>
+      <span className="preview-hint">{error || '拖动旋转 · 滚轮缩放'}</span>
     </div>
   );
 }

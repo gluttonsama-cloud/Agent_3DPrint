@@ -1,6 +1,7 @@
 node_modules/
 .venv/
 .sam-venv/
+.gpu-venv/
 dist/
 release/
 build/

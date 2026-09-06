@@ -1,0 +1,18 @@
+{
+  "model": "SAM 2.1 Hiera tiny",
+  "device": "NVIDIA GeForce RTX 5070 Laptop GPU",
+  "torch": "2.7.1+cu128",
+  "coldLoadSeconds": 3.602925499995763,
+  "automaticSeconds": 23.26064999999653,
+  "candidates": 96,
+  "selected": 50,
+  "warmPointSeconds": [
+    0.055815899999288376,
+    0.047067300001799595,
+    0.04737010000098962
+  ],
+  "peakVramMB": 988.03662109375,
+  "humanGroundTruth": false,
+  "humanCorrectionSeconds": null,
+  "iou": null
+}
