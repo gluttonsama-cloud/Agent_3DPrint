@@ -1,0 +1,41 @@
+{
+  "model": "SAM 2.1 Hiera tiny",
+  "sourceCommit": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+  "checkpointSHA256": "7402e0d864fa82708a20fbd15bc84245c2f26dff0eb43a4b5b93452deb34be69",
+  "torch": "2.14.0+cpu",
+  "device": "cpu",
+  "threads": 4,
+  "imagePixels": [
+    410,
+    410
+  ],
+  "modelLoadSeconds": 1.1146,
+  "trials": [
+    {
+      "encodeSeconds": 2.6772,
+      "predictSeconds": 0.1883,
+      "totalSeconds": 2.8655
+    },
+    {
+      "encodeSeconds": 2.5085,
+      "predictSeconds": 0.1226,
+      "totalSeconds": 2.6311
+    },
+    {
+      "encodeSeconds": 2.3946,
+      "predictSeconds": 0.1279,
+      "totalSeconds": 2.5225
+    }
+  ],
+  "peakRssMB": 1001.32,
+  "vramMB": 0,
+  "positivePoints": 24,
+  "negativePoints": 24,
+  "modelScore": 0.17528587579727173,
+  "agreementIoUWithAlgorithmReference": 0.0,
+  "humanGroundTruth": false,
+  "humanCorrectionSeconds": null,
+  "laborSavingProven": false,
+  "cloudCalls": 0,
+  "notes": "单图的可运行性及参考一致度实验，未测人工修正时间，不代表产品分割精度。"
+}

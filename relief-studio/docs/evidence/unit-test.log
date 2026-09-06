@@ -1,0 +1,15 @@
+
+> relief-studio@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 D:/AAAwork/Agent_3DPrint/relief-studio
+
+ ✓ src/model.test.ts (5 tests) 7ms
+ ✓ src/preview-model.test.ts (2 tests) 292ms
+
+ Test Files  2 passed (2)
+      Tests  7 passed (7)
+   Start at  17:17:08
+   Duration  2.64s (transform 151ms, setup 0ms, collect 203ms, tests 299ms, environment 0ms, prepare 397ms)
+

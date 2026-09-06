@@ -1,0 +1,343 @@
+/* 暖白工作台：铜色用于选中状态，深绿用于主要文件操作。 */
+:root {
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  color: #343a35;
+  background: #f3f2ee;
+  --line: #e7e6df;
+  --muted: #7b8076;
+  --accent: #a66b37;
+  --tint: #f6eee3;
+}
+* {
+  scrollbar-color: #d3d3c8 transparent;
+}
+button {
+  border-radius: 6px;
+}
+button:hover:enabled {
+  background: #f4f4ed;
+  border-color: #cecec2;
+}
+button:active:enabled {
+  background: #eaece3;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline-color: #bd8956;
+}
+input,
+select {
+  border-color: #e2e4db;
+  border-radius: 6px;
+  color: #3d443d;
+}
+input:disabled,
+select:disabled {
+  background: #f7f7f2;
+  color: #a1a497;
+}
+.primary {
+  background: #354d3d;
+  border-color: #354d3d;
+  color: #fff;
+  box-shadow: 0 2px 4px #273c2410;
+}
+.primary:hover:enabled {
+  background: #48604b;
+  border-color: #48604b;
+}
+.app-header {
+  height: 62px;
+  padding-inline: 24px;
+  background: #fcfcf9;
+}
+.brand {
+  gap: 11px;
+}
+.brand strong {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+.brand-symbol {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #354d3d;
+  box-shadow: inset 0 1px #ffffff20;
+}
+.brand-subtitle {
+  color: #878d7e;
+  letter-spacing: 1px;
+}
+.header-actions button {
+  min-height: 33px;
+  padding-inline: 16px;
+}
+.header-actions .primary {
+  padding-inline: 22px;
+}
+.document-bar {
+  height: 40px;
+  background: #f5f5ef;
+  padding-inline: 24px;
+}
+.file-icon {
+  color: #979c8e;
+}
+.save-state {
+  color: #979c8e;
+}
+.save-state.modified {
+  color: #a67439;
+}
+.sidebar {
+  background: #fcfcf9;
+}
+.sidebar-section {
+  border-bottom-color: #eeeee7;
+}
+h2 {
+  color: #424a40;
+  font-weight: 600;
+}
+.text-button {
+  color: #a16d3e;
+}
+.text-button:hover:enabled {
+  color: #774c29;
+  background: transparent;
+  border-color: transparent;
+}
+.size-fields input,
+.stack-field input,
+.stack-field select {
+  color: #3c443b;
+}
+.section-heading > span {
+  background: #eeefe7;
+  color: #8e9586;
+  border-radius: 5px;
+}
+.region-list {
+  padding-inline: 10px;
+}
+.region-card {
+  border-radius: 8px;
+  padding: 12px 10px;
+  margin-bottom: 7px;
+  min-height: 64px;
+}
+.region-card.selected {
+  background: #f6eee3;
+  border-color: #d9b58f;
+  box-shadow: none;
+}
+.region-card.selected:hover:enabled {
+  background: #f3e9da;
+  border-color: #cda47a;
+}
+.region-text strong {
+  font-size: 12px;
+}
+.region-text small {
+  color: #939889;
+}
+.swatch {
+  height: 28px;
+  width: 28px;
+  border-radius: 7px;
+}
+.region-height {
+  font-size: 18px;
+  font-weight: 300;
+  color: #565f50;
+}
+.empty-sidebar {
+  color: #949a8a;
+}
+.center-panel {
+  background: #eeeee7;
+  margin: 12px;
+  border: 1px solid #e2e4d9;
+  border-radius: 11px;
+  overflow: hidden;
+  box-shadow: 0 3px 12px #39433105;
+}
+.left-panel,
+.right-panel {
+  border-color: transparent;
+}
+.canvas-toolbar {
+  height: 47px;
+  background: #fffffc;
+  padding-inline: 14px;
+}
+.view-tabs {
+  height: 32px;
+  gap: 2px;
+  background: #f0f1e9;
+  padding: 3px;
+  border-radius: 7px;
+}
+.view-tabs button {
+  padding: 3px 13px;
+  border: 0;
+  border-radius: 5px;
+  font-size: 11px;
+}
+.view-tabs button.active {
+  background: #fff;
+  color: #435440;
+  box-shadow: 0 1px 4px #3c472b10;
+}
+.history-buttons button {
+  color: #6c7564;
+}
+.edit-tools {
+  background: #fcfcf8;
+  height: 43px;
+  border-bottom-color: #eceee5;
+}
+.edit-tools button.active {
+  color: #9b6636;
+  background: #f7efe3;
+  border-color: #ddc3a4;
+}
+.tool-options {
+  background: #f9faf5;
+  border-bottom-color: #e7e9df;
+}
+.tool-options select {
+  background: #fffffc;
+}
+.art-stage {
+  background: #efefe8;
+}
+.raster-frame {
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px #d9ddd0,
+    0 4px 20px #414e2610;
+}
+.checker {
+  background-color: #fcfdf9;
+  background-image:
+    linear-gradient(45deg, #e9ece2 25%, transparent 25%),
+    linear-gradient(-45deg, #e9ece2 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e9ece2 75%),
+    linear-gradient(-45deg, transparent 75%, #e9ece2 75%);
+}
+.canvas-dimension {
+  color: #8f9785;
+}
+.selection-bar {
+  background: #f8f9f3;
+  border-color: #e3e6db;
+}
+.canvas-bottom {
+  background: #fffffc;
+}
+.segmented {
+  background: #f0f1e9;
+  border-color: transparent;
+  border-radius: 6px;
+}
+.segmented button {
+  border-radius: 4px;
+}
+.segmented button.active {
+  color: #496044;
+  box-shadow: 0 1px 3px #3140240d;
+}
+.zoom-controls button {
+  background: transparent;
+  color: #78816e;
+}
+.layer-control {
+  background: #fffffc;
+}
+.stepper button,
+.height-presets button {
+  background: #f7f8f2;
+}
+.color-control span {
+  color: #89917f;
+}
+.output-summary {
+  background: #f4f5ee;
+  margin: 10px 12px 12px;
+  border: 1px solid #e6e9dc;
+  border-radius: 8px;
+  padding: 14px;
+}
+.output-summary strong {
+  color: #4c5b42;
+}
+.region-list-footer {
+  border-color: #eeeee7;
+}
+.statusbar {
+  background: #f4f4ee;
+  color: #88917e;
+  border-color: #e4e7da;
+}
+.empty-stage {
+  background: radial-gradient(ellipse at center, #fdfef9 0, #f1f2e9 80%);
+  gap: 18px;
+}
+.empty-file-icon {
+  color: #9ba78e;
+  background: #fcfdf8;
+  border-color: #e0e5d5;
+  border-radius: 20px;
+  box-shadow: 0 6px 22px #3c502b06;
+}
+.empty-stage h2 {
+  font-weight: 500;
+  letter-spacing: 2px;
+}
+.empty-stage small {
+  color: #9aa28f;
+}
+.preview-hint {
+  background: #fffff8e6;
+}
+.modal,
+.confirm-dialog {
+  background: #fdfdf9;
+  border-radius: 12px;
+}
+.modal-backdrop {
+  background: #29302255;
+}
+.crop-outline {
+  border-color: #b17f49;
+  box-shadow: 0 0 0 2000px #303d2966;
+}
+.busy-indicator {
+  color: #4b6040;
+}
+.danger {
+  color: #a6604e;
+}
+kbd {
+  color: #8e9684;
+  background: #f0f2e9;
+}
+@media (max-width: 1150px) {
+  .center-panel {
+    margin: 8px;
+  }
+  .output-summary {
+    margin: 8px;
+    padding: 12px;
+  }
+  .region-card {
+    padding-inline: 8px;
+  }
+  .region-text strong {
+    font-size: 11px;
+  }
+}

@@ -1,0 +1,116 @@
+.recognition-dialog {
+  width: min(1100px, 96vw);
+  height: min(820px, 94vh);
+  background: #fcfcf9;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 80px #27302340;
+}
+.recognition-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.recognition-dialog h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.recognition-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+.recognition-body > aside {
+  width: 260px;
+  flex: none;
+  padding: 18px;
+  overflow: auto;
+  border-right: 1px solid var(--line);
+}
+.recognition-body .view-tabs {
+  margin-bottom: 16px;
+  height: 34px;
+}
+.recognition-body .field-row input[type='checkbox'] {
+  width: 14px;
+}
+.recognition-stage {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background-color: #eee;
+  background-size: 16px 16px;
+}
+.recognition-stage canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  touch-action: none;
+  cursor: crosshair;
+  width: auto;
+  height: auto;
+}
+.recognition-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.recognition-tools [aria-pressed='true'] {
+  background: var(--tint);
+  border-color: var(--accent);
+}
+.candidate-list {
+  max-height: 230px;
+  overflow: auto;
+  margin: 12px 0;
+}
+.candidate-list > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-radius: 4px;
+}
+.candidate-list .active {
+  background: var(--tint);
+}
+.candidate-list button {
+  border: 0;
+  background: none;
+  flex: 1;
+  text-align: left;
+}
+.recognition-colors {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+.recognition-colors button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.recognition-dialog > footer {
+  border-top: 1px solid var(--line);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.recognition-dialog > footer p {
+  color: var(--muted);
+  font-size: 11px;
+  flex: 1;
+}
+.recognition-dialog > footer .primary {
+  flex: none;
+}

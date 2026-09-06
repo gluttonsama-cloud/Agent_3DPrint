@@ -1,0 +1,13 @@
+node_modules/
+.venv/
+.sam-venv/
+.gpu-venv/
+dist/
+release/
+build/
+engine-dist/
+__pycache__/
+*.spec
+artifacts/
+test-results/
+playwright-report/

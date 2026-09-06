@@ -1,0 +1,14 @@
+
+> relief-studio@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 38 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.45 kB │ gzip:   0.32 kB
+dist/assets/index-OvyZWWiZ.css   12.68 kB │ gzip:   3.62 kB
+dist/assets/index-Cmduf6Qk.js   238.94 kB │ gzip:  74.78 kB
+dist/assets/three-BBq6HRL4.js   479.48 kB │ gzip: 120.61 kB
+✓ built in 2.96s

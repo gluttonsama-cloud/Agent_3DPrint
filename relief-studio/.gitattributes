@@ -1,0 +1,3 @@
+# 保留第三方声明原文中的空白，不以项目格式化规则重写。
+licenses/** -whitespace
+docs/evidence/*.log -whitespace
