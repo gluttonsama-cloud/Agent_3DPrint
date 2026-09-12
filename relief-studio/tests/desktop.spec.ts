@@ -4,7 +4,172 @@ import path from 'node:path';
 
 const root = process.cwd();
 
-test('GPU 主体点选、独立部件、背景零层、原图保留', async () => {
+test('区域属性不再显示独立修整入口', async () => {
+  const app = await launchDesktop(),
+    page = await app.firstWindow();
+  try {
+    await page.getByRole('button', { name: '打开 55 mm 徽标示例' }).click();
+    await expect(page.getByRole('button', { name: '小幅修整', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '精确提取', exact: true })).toHaveCount(0);
+  } finally {
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().forEach((w) => w.destroy()),
+    );
+    await app.close();
+  }
+});
+
+test('框选补选传递原图坐标，保留框外画笔并支持撤销', async () => {
+  const app = await launchDesktop(),
+    page = await app.firstWindow();
+  try {
+    const images = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 100;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, 100, 100);
+      const source = canvas.toDataURL();
+      ctx.clearRect(0, 0, 100, 100);
+      ctx.fillRect(30, 30, 10, 10);
+      return { source, mask: canvas.toDataURL() };
+    });
+    // 替换模型 IPC，仅验证交互契约；真实 GPU 结果另做样本对照。
+    await app.evaluate(({ ipcMain }, mask) => {
+      ipcMain.removeHandler('relief:subject-status');
+      ipcMain.handle('relief:subject-status', () => ({ installed: true, directory: 'test' }));
+      ipcMain.removeHandler('relief:subject');
+      ipcMain.handle('relief:subject', (_, job) => {
+        if (job.action !== 'predict' || JSON.stringify(job.box) !== '[20,20,81,81]')
+          throw new Error('框坐标错误：' + JSON.stringify(job.box));
+        return { id: job.id, mask, elapsedSeconds: 0, peakVramMB: 0 };
+      });
+    }, images.mask);
+    await page.locator('input[type=file]').setInputFiles({
+      name: 'box.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(images.source.split(',')[1], 'base64'),
+    });
+    await page.getByRole('button', { name: '应用裁剪' }).click();
+    const dialog = page.getByRole('dialog', { name: '识别区域' });
+    await dialog.getByRole('button', { name: '主体提取', exact: true }).click();
+    const canvas = dialog.getByLabel('识别预览画布');
+    const box = (await canvas.boundingBox())!;
+    const position = (x: number, y: number) => ({
+      x: ((x + 0.5) / 100) * box.width,
+      y: ((y + 0.5) / 100) * box.height,
+    });
+    await dialog.getByRole('button', { name: '画笔修边', exact: true }).click();
+    await canvas.click({ position: position(5, 5) });
+    const brushOnly = await canvas.evaluate((c: HTMLCanvasElement) => c.toDataURL());
+    await dialog.getByRole('button', { name: '框选补选', exact: true }).click();
+    await dialog.getByRole('button', { name: '对照原图', exact: true }).click();
+    await expect(dialog.getByRole('button', { name: '查看主体', exact: true })).toBeVisible();
+    await canvas.click({ position: position(50, 50) });
+    await expect(dialog.getByRole('status')).toContainText('至少 8 × 8');
+    await expect(dialog.getByRole('button', { name: '对照原图', exact: true })).toBeVisible();
+    const drag = async () => {
+      const start = position(80, 80),
+        end = position(20, 20);
+      await page.mouse.move(box.x + start.x, box.y + start.y);
+      await page.mouse.down();
+      await page.mouse.move(box.x + end.x, box.y + end.y, { steps: 5 });
+      await page.mouse.up();
+      await expect(dialog.getByRole('status')).toContainText('已补选框内图案');
+    };
+    await drag();
+    await dialog.getByRole('button', { name: '撤销主体修改', exact: true }).click();
+    await expect
+      .poll(() => canvas.evaluate((c: HTMLCanvasElement) => c.toDataURL()))
+      .toBe(brushOnly);
+    await drag();
+    await dialog.getByRole('button', { name: '应用识别结果' }).click();
+    const filename = path.join(root, 'artifacts', 'local-box.relief.json');
+    await app.evaluate(({ dialog }, filePath) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath });
+    }, filename);
+    await page.getByRole('button', { name: '保存工程', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('工程已保存');
+    const saved = JSON.parse(await fs.readFile(filename, 'utf8'));
+    expect(saved.labels[505]).toBe(2);
+    expect(saved.labels[3535]).toBe(2);
+    expect(saved.labels[9090]).toBe(1);
+  } finally {
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().forEach((w) => w.destroy()),
+    );
+    await app.close();
+  }
+});
+
+test('分色背景逐块排除、恢复，保留主体中的同色白字', async () => {
+  const app = await launchDesktop(),
+    page = await app.firstWindow();
+  try {
+    const image = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 100;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, 100, 100);
+      ctx.fillStyle = 'black';
+      ctx.fillRect(20, 20, 60, 60);
+      ctx.fillStyle = 'white';
+      ctx.fillRect(40, 40, 20, 20);
+      return canvas.toDataURL();
+    });
+    await page.locator('input[type=file]').setInputFiles({
+      name: 'white-letter.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(image.split(',')[1], 'base64'),
+    });
+    await page.getByRole('button', { name: '应用裁剪' }).click();
+    const dialog = page.getByRole('dialog', { name: '识别区域' });
+    await dialog.getByRole('button', { name: '生成预览', exact: true }).click();
+    await expect(dialog.getByRole('status')).toContainText('已识别 2 个区域');
+    await dialog.getByRole('button', { name: '标记背景', exact: true }).click();
+    const canvas = dialog.getByLabel('识别预览画布');
+    const box = (await canvas.boundingBox())!;
+    const clickOutside = () =>
+      canvas.click({ position: { x: box.width * 0.05, y: box.height * 0.05 } });
+    const alphas = () =>
+      canvas.evaluate((element) => {
+        const ctx = (element as HTMLCanvasElement).getContext('2d')!;
+        return [ctx.getImageData(5, 5, 1, 1).data[3], ctx.getImageData(50, 50, 1, 1).data[3]];
+      });
+    await clickOutside();
+    await expect.poll(alphas).toEqual([0, 255]);
+    await clickOutside();
+    await expect.poll(alphas).toEqual([255, 255]);
+    await clickOutside();
+    await dialog.getByRole('button', { name: '恢复全部背景' }).click();
+    await expect.poll(alphas).toEqual([255, 255]);
+    await clickOutside();
+    await expect.poll(alphas).toEqual([0, 255]);
+    await page.screenshot({ path: path.join(root, 'artifacts', 'background-confirmation.png') });
+    await dialog.getByRole('button', { name: '应用识别结果' }).click();
+    const savePath = path.join(root, 'artifacts', 'background-confirmation.relief.json');
+    await app.evaluate(({ dialog }, filename) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath: filename });
+    }, savePath);
+    await page.getByRole('button', { name: '保存工程', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('工程已保存');
+    const saved = JSON.parse(await fs.readFile(savePath, 'utf8'));
+    expect(saved.labels[505]).toBe(0);
+    expect(saved.labels[5050]).toBeGreaterThan(0);
+    expect(saved.labels[3030]).toBeGreaterThan(0);
+    expect(saved.labels[5050]).not.toBe(saved.labels[3030]);
+  } finally {
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().forEach((w) => w.destroy()),
+    );
+    await app.close();
+  }
+});
+
+test('GPU 整体主体、直接补选排除撤销、背景零层', async () => {
+  // 打包版首次加载模型有额外开销；此项验证正确性，耗时另行记录。
+  test.setTimeout(180000);
   test.skip(process.env.RELIEF_TEST_GPU !== '1', '显式启用本机 GPU 测试');
   const app = await launchDesktop(),
     page = await app.firstWindow();
@@ -17,20 +182,28 @@ test('GPU 主体点选、独立部件、背景零层、原图保留', async () =
     const dialog = page.getByRole('dialog', { name: '识别区域' });
     await dialog.getByRole('button', { name: '主体提取', exact: true }).click();
     await dialog.getByRole('button', { name: '生成预览', exact: true }).click();
-    await expect(dialog.getByRole('status')).toContainText('找到', { timeout: 60000 });
+    await dialog.getByRole('button', { name: '停止识别', exact: true }).click();
+    await expect(dialog.getByRole('status')).toContainText('识别已取消');
+    await dialog.getByRole('button', { name: '生成预览', exact: true }).click();
+    await expect(dialog.getByRole('status')).toContainText('主体已提取', { timeout: 150000 });
     await page.screenshot({ path: path.join(root, 'artifacts', 'subject-dialog.png') });
-    const toggles = dialog.locator('.candidate-list input');
-    for (let i = 0; i < (await toggles.count()); i++) await toggles.nth(i).uncheck();
+    await expect(dialog.locator('.candidate-list')).toHaveCount(0);
+    await expect(dialog.getByRole('checkbox')).toHaveCount(0);
     const canvas = dialog.getByLabel('识别预览画布');
     const click = async (x: number, y: number) => {
       const box = (await canvas.boundingBox())!;
       await canvas.click({ position: { x: (x / 1280) * box.width, y: (y / 1280) * box.height } });
-      await expect(dialog.getByRole('status')).toContainText('部件已更新', { timeout: 30000 });
+      await expect(dialog.getByRole('status')).toContainText('可撤销', { timeout: 30000 });
     };
-    await dialog.getByRole('button', { name: '添加独立部件' }).click();
-    await click(627, 653);
-    await dialog.getByRole('button', { name: '添加独立部件' }).click();
+    await dialog.getByRole('button', { name: '画笔修边', exact: true }).click();
+    const box = (await canvas.boundingBox())!;
+    await canvas.click({ position: { x: (100 / 1280) * box.width, y: (100 / 1280) * box.height } });
+    await dialog.getByRole('button', { name: '点击补选', exact: true }).click();
+    await click(505, 790);
+    await dialog.getByRole('button', { name: '点击排除', exact: true }).click();
     await click(876, 663);
+    await dialog.getByRole('button', { name: '撤销主体修改', exact: true }).click();
+    await expect(dialog.getByRole('status')).toContainText('已撤销');
     await dialog.getByRole('button', { name: '应用识别结果' }).click();
     await expect(page.locator('.region-height')).toHaveText(['0 层', '10 层']);
     const savePath = path.join(root, 'artifacts', 'gpu-subject.relief.json');
@@ -42,6 +215,9 @@ test('GPU 主体点选、独立部件、背景零层、原图保留', async () =
     const saved = JSON.parse(await fs.readFile(savePath, 'utf8'));
     expect(saved.labels[653 * 1280 + 627]).toBe(2);
     expect(saved.labels[663 * 1280 + 876]).toBe(2);
+    expect(saved.labels[790 * 1280 + 505]).toBe(2);
+    expect(saved.labels[100 * 1280 + 100]).toBe(2);
+    expect(saved.labels[780 * 1280 + 340]).toBe(1);
     expect(saved.labels[50 * 1280 + 50]).toBe(1);
     expect(saved.labels[1225 * 1280 + 1150]).toBe(1);
     expect(saved.labels.every((id: number) => id === 1 || id === 2)).toBe(true);
@@ -58,6 +234,7 @@ test('重新识别先预览，取消不修改，应用后整步撤销', async ()
     page = await app.firstWindow();
   try {
     await page.getByRole('button', { name: '打开 55 mm 徽标示例' }).click();
+    await expect(page.locator('.region-height')).toHaveText(['0 层', '5 层', '10 层']);
     const recovery = await page.evaluate(async () => {
       const bridge = window.relief!;
       const sample = await bridge.sample();

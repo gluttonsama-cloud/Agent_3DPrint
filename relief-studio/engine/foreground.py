@@ -9,6 +9,33 @@ def foreground_mask(probability, visible):
   return (probability >= .5) & visible
 
 
+def selection_bounds(box, width, height):
+  """框坐标为原图像素，右下边界不包含。"""
+  if box is None:
+    return [0, 0, width, height]
+  if (not isinstance(box, list) or len(box) != 4 or
+        any(type(v) is not int for v in box) or
+        not (0 <= box[0] < box[2] <= width and 0 <= box[1] < box[3] <= height) or
+        box[2]-box[0] < 8 or box[3]-box[1] < 8):
+    raise ValueError('框选范围无效，宽高至少需要 8 像素')
+  return box
+
+
+def regional_foreground(model, rgba, visible, box=None):
+  """局部对照实验：预测裁剪图，再映射回原图。"""
+  height, width = visible.shape
+  left, top, right, bottom = selection_bounds(box, width, height)
+  valid = visible[top:bottom, left:right]
+  if not valid.any():
+    raise ValueError('框内没有可选像素')
+  rgb = rgba[top:bottom, left:right, :3].copy()
+  rgb[~valid] = 255
+  patch = foreground_mask(model.predict(rgb), valid)
+  mask = np.zeros_like(visible, dtype=bool)
+  mask[top:bottom, left:right] = patch
+  return mask
+
+
 def clicked_mask(masks, scores, x, y):
   available = [i for i in range(len(masks)) if masks[i, y, x]]
   if not available:

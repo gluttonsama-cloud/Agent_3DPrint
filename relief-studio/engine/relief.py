@@ -103,7 +103,7 @@ def validate_project(project):
 
 def segment(job):
   rgba = decode_image(job.get('image'))
-  from color_partition import partition
+  from color_partition import alpha_edge_colors, partition
   requested = job.get('colors', 'auto')
   colors = None if requested == 'auto' else integer(requested, 1, 12, '分区颜色数')
   tolerance = job.get('tolerance', 12)
@@ -117,11 +117,12 @@ def segment(job):
     if not isinstance(valid, list) or len(valid) != visible.size or any(type(v) is not int or v not in (0, 1) for v in valid):
       raise ValueError('有效范围无效')
     visible &= np.array(valid, dtype=bool).reshape(visible.shape)
-  rgb = rgba[:, :, :3][visible]
+  partition_rgb = alpha_edge_colors(rgba, visible)
+  rgb = partition_rgb[visible]
   if not len(rgb):
     raise ValueError('图片没有可打印像素')
   kernel = np.ones((3, 3), dtype=np.uint8)
-  spread = cv2.dilate(rgba[:, :, :3], kernel).astype(np.int16)-cv2.erode(rgba[:, :, :3], kernel)
+  spread = cv2.dilate(partition_rgb, kernel).astype(np.int16)-cv2.erode(partition_rgb, kernel)
   interior = (spread.max(axis=2) <= 12)[visible]
   flat_labels, centers = partition(rgb, colors, tolerance, interior)
   labels = np.zeros(visible.shape, dtype=np.uint16)

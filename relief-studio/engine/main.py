@@ -27,6 +27,16 @@ def main():
       project = segment(job)
       output.mkdir(parents=True, exist_ok=False)
       write_json(output/'project.json', project)
+    elif action == 'repair':
+      from repair import repair_project
+      result = repair_project(job)
+      output.mkdir(parents=True, exist_ok=False)
+      write_json(output/'result.json', result)
+    elif action == 'normalize':
+      from metadata import restore_metadata
+      validate_project(job.get('project'))
+      output.mkdir(parents=True, exist_ok=False)
+      write_json(output/'project.json', restore_metadata(job['project']))
     elif action == 'validate':
       validate_project(job.get('project'))
     elif action == 'export':

@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld(
   'relief',
   Object.freeze({
     segment: (input) => ipcRenderer.invoke('relief:segment', input),
+    repair: (input) => ipcRenderer.invoke('relief:repair', input),
+    refine: (input) => ipcRenderer.invoke('relief:refine', input),
     subject: (input) => ipcRenderer.invoke('relief:subject', input),
     subjectStatus: () => ipcRenderer.invoke('relief:subject-status'),
     cancelSubject: () => ipcRenderer.invoke('relief:subject-cancel'),

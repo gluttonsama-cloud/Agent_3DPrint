@@ -65,8 +65,11 @@ async function runEngine(job, destination) {
         }
       });
     });
-    if (job.action === 'segment') {
+    if (job.action === 'segment' || job.action === 'normalize') {
       return JSON.parse(await fs.readFile(path.join(output, 'project.json'), 'utf8'));
+    }
+    if (job.action === 'repair') {
+      return JSON.parse(await fs.readFile(path.join(output, 'result.json'), 'utf8'));
     }
     return result;
   } finally {
@@ -108,6 +111,8 @@ function registerHandlers() {
     },
     true,
   );
+  handle('relief:repair', (input) => runEngine({ ...input, action: 'repair' }));
+  handle('relief:refine', (input) => subject.request({ ...input, action: 'refine' }));
   handle('relief:subject', (input) => subject.request(input));
   handle('relief:subject-status', () => subject.status(), true);
   handle('relief:subject-cancel', () => subject.stop(), true);
@@ -152,8 +157,7 @@ function registerHandlers() {
     const filename = result.filePaths[0];
     if ((await fs.stat(filename)).size > 64_000_000) throw new Error('工程文件过大');
     const project = JSON.parse(await fs.readFile(filename, 'utf8'));
-    await runEngine({ action: 'validate', project });
-    return project;
+    return await runEngine({ action: 'normalize', project });
   });
   handle('relief:export', async (project) => {
     const result = await dialog.showOpenDialog(mainWindow, {

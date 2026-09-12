@@ -5,7 +5,7 @@ export function combineSubjectMask(
   operation: 'keep' | 'remove',
 ): Uint8Array {
   if (current.length !== patch.length) throw new Error('主体掩膜尺寸不一致');
-  return current.map((value, i) => operation === 'keep'
-    ? (value || patch[i] ? 1 : 0)
-    : (value && !patch[i] ? 1 : 0));
+  return current.map((value, i) =>
+    operation === 'keep' ? (value || patch[i] ? 1 : 0) : value && !patch[i] ? 1 : 0,
+  );
 }

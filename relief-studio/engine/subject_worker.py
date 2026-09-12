@@ -1,4 +1,4 @@
-"""本地 SAM 常驻进程；stdin/stdout JSONL，仅加载可信随包模型。"""
+"""本地 BiRefNet 整体提取与 SAM 点击修正；stdin/stdout JSONL。"""
 import argparse
 import contextlib
 import hashlib
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 from relief import decode_image, encode_image
-from foreground import ForegroundModel, foreground_mask, clicked_mask
+from foreground import ForegroundModel, regional_foreground, clicked_mask, selection_bounds
 
 
 class SubjectWorker:
@@ -29,14 +29,18 @@ class SubjectWorker:
     digest = hashlib.sha256(data.encode()).hexdigest()
     if digest != self.digest:
       self.rgba = decode_image(data)
-      rgb = self.rgba[:, :, :3].copy()
-      rgb[self.rgba[:, :, 3] == 0] = 255
       self.digest = digest
     return self.rgba
 
   def run(self, job):
     started = time.perf_counter()
     with self.torch.inference_mode():
+      if job['action'] == 'refine':
+        from refine import refine_project
+        result = refine_project(self, job)
+        self.torch.cuda.synchronize()
+        return {**result, 'elapsedSeconds': time.perf_counter()-started,
+                'peakVramMB': self.torch.cuda.max_memory_allocated()/1024**2}
       rgba = self.image(job['image'])
       visible = rgba[:, :, 3] > 0
       valid = job.get('validMask')
@@ -50,14 +54,31 @@ class SubjectWorker:
           if not (directory/'model.safetensors').is_file():
             raise RuntimeError('缺少高精度主体模型，请更新 model-runtime 模型包')
           self.foreground = ForegroundModel(directory)
-        rgb = rgba[:, :, :3].copy()
-        rgb[~visible] = 255
-        probability = self.foreground.predict(rgb)
-        result = {'mask': self.encode(foreground_mask(probability, visible)),
-                  'model': 'BiRefNet_HR'}
+        if job.get('box') is not None:
+          mask = regional_foreground(self.foreground, rgba, visible, job.get('box'))
+          optimization = None
+        else:
+          from auto_optimize import optimize_subject
+          rgb = rgba[:, :, :3].copy()
+          rgb[~visible] = 255
+          probability = self.foreground.predict(rgb)
+          self.refine_probability = probability
+          self.refine_probability_digest = self.digest
+          self.source_data = job['image']
+          mask, optimization = optimize_subject(self, rgba, visible, probability)
+        result = {'mask': self.encode(mask),
+                  'model': 'BiRefNet_HR', 'optimization': optimization}
       elif job['action'] == 'predict':
         points = job.get('points', [])
-        if not 1 <= len(points) <= 256:
+        box = job.get('box')
+        if box is not None:
+          left, top, right, bottom = selection_bounds(box, rgba.shape[1], rgba.shape[0])
+          box_visible = np.zeros_like(visible)
+          box_visible[top:bottom, left:right] = visible[top:bottom, left:right]
+          visible = box_visible
+          if not visible.any():
+            raise ValueError('框内没有可选像素')
+        if not isinstance(points, list) or not (0 if box is not None else 1) <= len(points) <= 256:
           raise ValueError('需要 1 至 256 个提示点')
         for point in points:
           if (point.get('label') not in (0, 1) or not all(type(point.get(k)) in (int, float)
@@ -77,8 +98,10 @@ class SubjectWorker:
             self.predictor.set_image(rgb)
             self.predictor_digest = self.digest
           masks, scores, _ = self.predictor.predict(
-            point_coords=np.array([[p['x'], p['y']] for p in points], dtype=np.float32),
-            point_labels=np.array([p['label'] for p in points]), multimask_output=True)
+            point_coords=np.array([[p['x'], p['y']] for p in points], dtype=np.float32) if points else None,
+            point_labels=np.array([p['label'] for p in points]) if points else None,
+            box=np.array([left, top, right-1, bottom-1], dtype=np.float32) if box is not None else None,
+            multimask_output=True)
         if len(points) == 1 and points[0]['label'] == 1:
           mask = clicked_mask(masks > 0, scores, int(points[0]['x']), int(points[0]['y']))
         else:
@@ -99,6 +122,10 @@ class SubjectWorker:
 
 
 def main():
+  # JSONL 管道固定为 UTF-8，不能依赖 Windows 系统代码页。
+  for stream in (sys.stdin, sys.stdout, sys.stderr):
+    if hasattr(stream, 'reconfigure'):
+      stream.reconfigure(encoding='utf-8')
   parser = argparse.ArgumentParser()
   parser.add_argument('--checkpoint', required=True)
   args = parser.parse_args()

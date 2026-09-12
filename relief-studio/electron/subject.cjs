@@ -16,6 +16,7 @@ module.exports = function subjectRuntime(app, root) {
   const checkpoint = app.isPackaged
     ? path.join(directory, 'sam2.1_hiera_tiny.pt')
     : path.join(root, 'artifacts', 'sam2.1_hiera_tiny.pt');
+  const foreground = path.join(path.dirname(checkpoint), 'birefnet-hr', 'model.safetensors');
   function stop(message = '识别已取消') {
     const current = child;
     child = null;
@@ -29,13 +30,16 @@ module.exports = function subjectRuntime(app, root) {
   }
   return {
     stop,
-    status: () => ({ installed: fs.existsSync(command) && fs.existsSync(checkpoint), directory }),
+    status: () => ({
+      installed: fs.existsSync(command) && fs.existsSync(checkpoint) && fs.existsSync(foreground),
+      directory,
+    }),
     request(job) {
-      if (!fs.existsSync(command) || !fs.existsSync(checkpoint))
+      if (!fs.existsSync(command) || !fs.existsSync(checkpoint) || !fs.existsSync(foreground))
         return Promise.reject(
           new Error('尚未安装 GPU 主体模型包，请将 model-runtime 放在程序同目录。'),
         );
-      if (!job || !['propose', 'predict'].includes(job.action) || typeof job.id !== 'string')
+      if (!job || !['propose', 'predict', 'refine'].includes(job.action) || typeof job.id !== 'string')
         return Promise.reject(new Error('主体识别请求无效'));
       const line = JSON.stringify(job);
       if (Buffer.byteLength(line) > 64_000_000) return Promise.reject(new Error('识别图片过大'));
@@ -46,6 +50,7 @@ module.exports = function subjectRuntime(app, root) {
           windowsHide: true,
           shell: false,
           stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
         });
         child = current;
         buffer = '';
