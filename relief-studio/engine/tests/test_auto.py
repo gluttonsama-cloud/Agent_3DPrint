@@ -7,6 +7,27 @@ from relief import segment
 
 
 class AutoTests(unittest.TestCase):
+  def test_partial_alpha_edge_uses_adjacent_solid_color(self):
+    pixels = np.zeros((20, 20, 4), dtype=np.uint8)
+    pixels[2:18, 2:18] = [180, 30, 20, 255]
+    pixels[1, 2:18] = [255, 0, 0, 1]
+    result = segment({'image': data_url(pixels)})
+    self.assertEqual(len(result['regions']), 1)
+    self.assertTrue(all(result['labels'][22:38]))
+    from relief import decode_image
+    np.testing.assert_array_equal(decode_image(result['image']), pixels)
+
+  def test_isolated_translucent_detail_keeps_its_color(self):
+    pixels = np.zeros((20, 20, 4), dtype=np.uint8)
+    pixels[4:18, 4:18] = [180, 30, 20, 255]
+    pixels[2, 4] = [0, 255, 0, 120]
+    result = segment({'image': data_url(pixels)})
+    self.assertEqual(len(result['regions']), 2)
+    self.assertNotEqual(result['labels'][44], result['labels'][84])
+    pixels[:, :, 3] = 120
+    result = segment({'image': data_url(pixels)})
+    self.assertEqual(len(result['regions']), 3)
+
   def test_logo_auto_three_zero_heights(self):
     source = json.loads((Path(__file__).parents[2]/'samples/sample-project.json').read_text('utf-8'))
     result = segment({'image': source['image']})

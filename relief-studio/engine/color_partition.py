@@ -3,6 +3,25 @@ import cv2
 import numpy as np
 
 
+def alpha_edge_colors(rgba, visible):
+  """仅为分色修正近邻透明边缘的 RGB；不改原图或孤立的半透明细节。"""
+  rgb = rgba[:, :, :3].copy()
+  solid = visible & (rgba[:, :, 3] == 255)
+  partial = visible & (rgba[:, :, 3] < 255)
+  if not solid.any() or not partial.any():
+    return rgb
+  distance, nearest = cv2.distanceTransformWithLabels(
+    (~solid).astype(np.uint8), cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL)
+  _, components = cv2.connectedComponents(visible.astype(np.uint8), connectivity=4)
+  colors = np.zeros((nearest.max()+1, 3), dtype=np.uint8)
+  owners = np.zeros(nearest.max()+1, dtype=np.int32)
+  colors[nearest[solid]] = rgb[solid]
+  owners[nearest[solid]] = components[solid]
+  edge = partial & (distance <= 3) & (owners[nearest] == components)
+  rgb[edge] = colors[nearest[edge]]
+  return rgb
+
+
 def partition(rgb, count, tolerance, interior=None):
   bins = (rgb[:, 0].astype(np.int32)//8)*1024 + (rgb[:, 1].astype(np.int32)//8)*32 + rgb[:, 2]//8
   weights = np.bincount(bins, minlength=32768)

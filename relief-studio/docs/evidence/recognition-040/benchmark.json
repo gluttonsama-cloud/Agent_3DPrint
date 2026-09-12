@@ -1,0 +1,26 @@
+{
+  "model": "BiRefNet_HR",
+  "automaticSeconds": 7.510351700000001,
+  "peakVramMB": 5125.1103515625,
+  "device": "NVIDIA GeForce RTX 5070 Laptop GPU",
+  "humanGroundTruth": false,
+  "iou": null,
+  "humanCorrectionSeconds": null,
+  "corrections": [
+    {
+      "x": 505,
+      "y": 790,
+      "seconds": 2.089936600000101
+    },
+    {
+      "x": 923,
+      "y": 466,
+      "seconds": 0.060240799999974115
+    },
+    {
+      "x": 794,
+      "y": 747,
+      "seconds": 0.060292799999956515
+    }
+  ]
+}

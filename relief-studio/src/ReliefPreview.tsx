@@ -4,14 +4,28 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Project } from './types';
 import { previewData } from './preview-model';
 
-export function ReliefPreview({ project }: { project: Project }) {
+export interface PreviewCamera {
+  position: [number, number, number];
+  target: [number, number, number];
+}
+export function ReliefPreview({
+  project,
+  cameraState,
+  comparison,
+  comparisonTarget,
+}: {
+  project: Project;
+  cameraState?: { current: PreviewCamera | null };
+  comparison?: Project;
+  comparisonTarget?: number;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const [error, setError] = useState('');
   useEffect(() => {
     const host = container.current!;
     let data: ReturnType<typeof previewData>;
     try {
-      data = previewData(project);
+      data = previewData(project, comparison, comparisonTarget);
     } catch (value) {
       setError(value instanceof Error ? value.message : String(value));
       return;
@@ -31,6 +45,18 @@ export function ReliefPreview({ project }: { project: Project }) {
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 1000);
     camera.position.set(65, 90, 112);
     const controls = new OrbitControls(camera, renderer.domElement);
+    if (cameraState?.current) {
+      camera.position.fromArray(cameraState.current.position);
+      controls.target.fromArray(cameraState.current.target);
+    }
+    const rememberCamera = () => {
+      if (cameraState)
+        cameraState.current = {
+          position: camera.position.toArray() as [number, number, number],
+          target: controls.target.toArray() as [number, number, number],
+        };
+    };
+    controls.addEventListener('change', rememberCamera);
     controls.enableDamping = true;
     controls.minDistance = 35;
     controls.maxDistance = 250;
@@ -155,6 +181,54 @@ export function ReliefPreview({ project }: { project: Project }) {
       side: THREE.DoubleSide,
     });
     scene.add(new THREE.Mesh(sideGeometry, sideMaterial));
+    // 增加显示为绿色顶面；删除用原高度红线标记，不改工程或导出数据。
+    const addedVertices: number[] = [],
+      removedEdges: number[] = [];
+    if (comparison && comparisonTarget !== undefined) {
+      const oldLevels = new Map(comparison.regions.map((r) => [r.id, r.layers]));
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          const i = y * w + x;
+          if (comparison.labels[i] === project.labels[i]) continue;
+          if (project.labels[i] === comparisonTarget) {
+            const begin = x;
+            while (
+              x + 1 < w &&
+              project.labels[y * w + x + 1] === comparisonTarget &&
+              comparison.labels[y * w + x + 1] !== comparisonTarget
+            )
+              x++;
+            const top = z[i] + 0.025;
+            quad(
+              addedVertices,
+              [px(begin), top, py(y)],
+              [px(begin), top, py(y + 1)],
+              [px(x + 1), top, py(y + 1)],
+              [px(x + 1), top, py(y)],
+            );
+          } else if (comparison.labels[i] === comparisonTarget) {
+            const top = 0.275 + (oldLevels.get(comparisonTarget) || 0) * 0.22;
+            const removed = (n: number) =>
+              comparison.labels[n] === comparisonTarget && project.labels[n] !== comparisonTarget;
+            if (x === 0 || !removed(i - 1))
+              removedEdges.push(px(x), top, py(y), px(x), top, py(y + 1));
+            if (x === w - 1 || !removed(i + 1))
+              removedEdges.push(px(x + 1), top, py(y), px(x + 1), top, py(y + 1));
+            if (y === 0 || !removed(i - w))
+              removedEdges.push(px(x), top, py(y), px(x + 1), top, py(y));
+            if (y === h - 1 || !removed(i + w))
+              removedEdges.push(px(x), top, py(y + 1), px(x + 1), top, py(y + 1));
+          }
+        }
+    }
+    const addedGeometry = new THREE.BufferGeometry();
+    addedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(addedVertices, 3));
+    const addedMaterial = new THREE.MeshBasicMaterial({ color: 0x00e691, side: THREE.DoubleSide });
+    scene.add(new THREE.Mesh(addedGeometry, addedMaterial));
+    const removedGeometry = new THREE.BufferGeometry();
+    removedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(removedEdges, 3));
+    const removedMaterial = new THREE.LineBasicMaterial({ color: 0xff3750, depthTest: false });
+    scene.add(new THREE.LineSegments(removedGeometry, removedMaterial));
     scene.add(new THREE.HemisphereLight(0xffffff, 0x9a9b87, 1.7));
     const light = new THREE.DirectionalLight(0xffffff, 1.5);
     light.position.set(-50, 100, 40);
@@ -174,6 +248,8 @@ export function ReliefPreview({ project }: { project: Project }) {
     });
     return () => {
       resize.disconnect();
+      rememberCamera();
+      controls.removeEventListener('change', rememberCamera);
       renderer.setAnimationLoop(null);
       controls.dispose();
       geometry.dispose();
@@ -181,6 +257,10 @@ export function ReliefPreview({ project }: { project: Project }) {
       material.dispose();
       sideMaterial.dispose();
       texture.dispose();
+      addedGeometry.dispose();
+      addedMaterial.dispose();
+      removedGeometry.dispose();
+      removedMaterial.dispose();
       grid.geometry.dispose();
       (Array.isArray(grid.material) ? grid.material : [grid.material]).forEach((value) =>
         value.dispose(),
@@ -188,7 +268,7 @@ export function ReliefPreview({ project }: { project: Project }) {
       renderer.dispose();
       host.removeChild(renderer.domElement);
     };
-  }, [project]);
+  }, [project, comparison, comparisonTarget, cameraState]);
   return (
     <div className="preview-wrap">
       <div className="preview-host" ref={container} />
