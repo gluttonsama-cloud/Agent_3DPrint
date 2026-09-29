@@ -1,0 +1,76 @@
+{
+  "protection": {
+    "type": "uint8",
+    "data": "AAECBAcFAAAAAAAA",
+    "encoding": "base64-le"
+  },
+  "original": {
+    "type": "uint8",
+    "data": "AHjIABR4yP8oeMj/PHjI/1B4yP9keMj/eHjI/4x4yP+geMj/tHjI/8h4yP/ceMj/",
+    "encoding": "base64-le"
+  },
+  "height": 3,
+  "device": {
+    "automaticWhite": "unknown",
+    "colorSpace": "RGB",
+    "name": "通用未验证配置",
+    "iccPath": null,
+    "whitePolarity": "unknown",
+    "id": "generic-unverified",
+    "verified": false
+  },
+  "labels": {
+    "type": "uint16",
+    "data": "AAABAAIAAwAEAAAAAgADAAQAAQACAAMA",
+    "encoding": "base64-le"
+  },
+  "sizeMm": [
+    4,
+    3
+  ],
+  "width": 4,
+  "colors": {
+    "type": "uint8",
+    "data": "AHjIABR4yP8oeMj/PHjI/1B4yP9keMj/eHjI/4x4yP+geMj/tHjI/8h4yP/ceMj/",
+    "encoding": "base64-le"
+  },
+  "revision": 0,
+  "regions": [
+    {
+      "defaultLayers": 0,
+      "name": "区域 1",
+      "color": "#0078c8",
+      "id": 1
+    },
+    {
+      "defaultLayers": 3,
+      "name": "区域 2",
+      "color": "#0078c8",
+      "id": 2
+    },
+    {
+      "defaultLayers": 6,
+      "name": "区域 3",
+      "color": "#0078c8",
+      "id": 3
+    },
+    {
+      "defaultLayers": 10,
+      "name": "区域 4",
+      "color": "#0078c8",
+      "id": 4
+    }
+  ],
+  "version": 2,
+  "name": "4x3 合同样例",
+  "heights": {
+    "type": "uint16",
+    "data": "AAAAAAMABgAKAAAAAwAGAAoAAAADAAYA",
+    "encoding": "base64-le"
+  },
+  "sessionId": "fixture-v2",
+  "heightMapping": {
+    "mmPerLayer": 0.1,
+    "kind": "design"
+  }
+}
