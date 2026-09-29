@@ -87,3 +87,36 @@ def partition(rgb, count, tolerance, interior=None):
     labels[start:start+len(pixels)] = ((pixels[:, None]-centers)**2).sum(2).argmin(1)+1
   palette = cv2.cvtColor(centers.reshape(1,-1,3), cv2.COLOR_LAB2RGB)[0]
   return labels, np.clip(np.rint(palette*255), 0, 255).astype(np.uint8)
+
+
+def merge_material_shades(labels, palette):
+  """合并有色材质的近似色相明暗；无彩色的黑白区域保持独立。"""
+  hsv = cv2.cvtColor((palette.astype(np.float32)/255).reshape(1, -1, 3),
+                     cv2.COLOR_RGB2HSV)[0]
+  lab = cv2.cvtColor((palette.astype(np.float32)/255).reshape(1, -1, 3),
+                     cv2.COLOR_RGB2LAB)[0]
+  warm_white = (lab[:, 0] >= 85) & (np.linalg.norm(lab[:, 1:], axis=1) < 18)
+  chromatic = (hsv[:, 1] >= 0.12) & (hsv[:, 2] >= 0.15) & ~warm_white
+  groups = []
+  for index, (hue, saturation, value) in enumerate(hsv):
+    target = None
+    if chromatic[index]:
+      for group in groups:
+        # 与组内每个颜色均接近，避免通过中间色连续合并不同色相。
+        if all(chromatic[j] and
+               min(abs(hue-hsv[j, 0]), 360-abs(hue-hsv[j, 0])) <= 14 for j in group):
+          target = group
+          break
+    if target is None:
+      groups.append([index])
+    else:
+      target.append(index)
+  weights = np.bincount(labels, minlength=len(palette)+1)[1:]
+  lookup = np.zeros(len(palette)+1, dtype=np.uint16)
+  colors = []
+  for group in groups:
+    if not weights[group].sum():
+      continue
+    lookup[np.array(group)+1] = len(colors)+1
+    colors.append(np.rint(np.average(palette[group], axis=0, weights=weights[group])))
+  return lookup[labels], np.array(colors, dtype=np.uint8)

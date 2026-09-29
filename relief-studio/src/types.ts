@@ -19,6 +19,8 @@ export interface SegmentInput {
   colors: number | 'auto';
   tolerance?: number;
   validMask?: number[];
+  subjectMask?: number[];
+  subjectLayers?: number;
   sizeMm: [number, number];
   name: string;
 }

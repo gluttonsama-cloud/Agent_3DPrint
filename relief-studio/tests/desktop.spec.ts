@@ -69,6 +69,7 @@ test('框选补选传递原图坐标，保留框外画笔并支持撤销', async
     await expect(dialog.getByRole('status')).toContainText('至少 8 × 8');
     await expect(dialog.getByRole('button', { name: '对照原图', exact: true })).toBeVisible();
     const drag = async () => {
+      await expect(dialog.getByRole('button', { name: '框选补选', exact: true })).toBeEnabled();
       const start = position(80, 80),
         end = position(20, 20);
       await page.mouse.move(box.x + start.x, box.y + start.y);
