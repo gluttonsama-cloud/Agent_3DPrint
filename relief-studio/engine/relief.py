@@ -103,7 +103,7 @@ def validate_project(project):
 
 def segment(job):
   rgba = decode_image(job.get('image'))
-  from color_partition import alpha_edge_colors, partition
+  from color_partition import alpha_edge_colors, partition, merge_material_shades
   requested = job.get('colors', 'auto')
   colors = None if requested == 'auto' else integer(requested, 1, 12, '分区颜色数')
   tolerance = job.get('tolerance', 12)
@@ -117,6 +117,15 @@ def segment(job):
     if not isinstance(valid, list) or len(valid) != visible.size or any(type(v) is not int or v not in (0, 1) for v in valid):
       raise ValueError('有效范围无效')
     visible &= np.array(valid, dtype=bool).reshape(visible.shape)
+  printable = visible.copy()
+  subject = job.get('subjectMask')
+  subject_layers = 0
+  if subject is not None:
+    if not isinstance(subject, list) or len(subject) != visible.size or any(
+        type(v) is not int or v not in (0, 1) for v in subject):
+      raise ValueError('主体范围无效')
+    subject_layers = integer(job.get('subjectLayers', 10), 0, MAX_LAYERS, '主体层数')
+    visible &= np.array(subject, dtype=bool).reshape(visible.shape)
   partition_rgb = alpha_edge_colors(rgba, visible)
   rgb = partition_rgb[visible]
   if not len(rgb):
@@ -125,11 +134,27 @@ def segment(job):
   spread = cv2.dilate(partition_rgb, kernel).astype(np.int16)-cv2.erode(partition_rgb, kernel)
   interior = (spread.max(axis=2) <= 12)[visible]
   flat_labels, centers = partition(rgb, colors, tolerance, interior)
+  if subject is not None and colors is None:
+    flat_labels, centers = merge_material_shades(flat_labels, centers)
   labels = np.zeros(visible.shape, dtype=np.uint16)
   labels[visible] = flat_labels
+  from color_edges import refine_color_edges
+  labels = refine_color_edges(partition_rgb, labels, centers)
   regions = [{'id': index+1, 'name': f'区域 {index+1}',
               'color': '#' + ''.join(f'{int(c):02x}' for c in center), 'layers': 0}
              for index, center in enumerate(centers)]
+  if subject is not None:
+    labels[visible] += 1
+    background = printable & ~visible
+    labels[background] = 1
+    for region in regions:
+      region['id'] += 1
+      region['name'] = f"主体色区 {region['id']-1}"
+      region['layers'] = subject_layers
+    if background.any():
+      color = np.rint(np.mean(rgba[background, :3], axis=0)).astype(np.uint8)
+      regions.insert(0, {'id': 1, 'name': '平面背景',
+                        'color': '#' + ''.join(f'{int(c):02x}' for c in color), 'layers': 0})
   project = {'version': 1, 'name': str(job.get('name', '未命名工程'))[:200],
              'width': rgba.shape[1], 'height': rgba.shape[0], 'sizeMm': size,
              'image': encode_image(rgba), 'labels': labels.ravel().tolist(), 'regions': regions}

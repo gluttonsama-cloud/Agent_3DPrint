@@ -22,6 +22,8 @@ export function RecognitionDialog(props: Props) {
   const [height, setHeight] = useState(10),
     [preview, setPreview] = useState<Project | null>(null);
   const [subject, setSubject] = useState<Uint8Array | null>(null);
+  const [subjectPreview, setSubjectPreview] = useState<Project | null>(null);
+  const [subjectColor, setSubjectColor] = useState<number | null>(null);
   const [background, setBackground] = useState<Uint8Array | null>(null);
   const [markBackground, setMarkBackground] = useState(false);
   const [history, setHistory] = useState<(Uint8Array | null)[]>([]);
@@ -66,17 +68,42 @@ export function RecognitionDialog(props: Props) {
   function currentMask() {
     return subject || new Uint8Array((source.current?.width || 0) * (source.current?.height || 0));
   }
-  function updateSubject(mask: Uint8Array) {
+  async function partitionSubject(mask: Uint8Array, id: number) {
+    setSubjectPreview(null);
+    setSubjectColor(null);
+    if (!mask.some((value, index) => value && valid(index))) return null;
+    setStatus('正在识别主体颜色并合并近似色…');
+    const result = await window.relief!.segment({
+      image: props.image,
+      name: props.name,
+      sizeMm: props.sizeMm,
+      validMask: props.validMask,
+      subjectMask: Array.from(mask),
+      subjectLayers: height,
+      colors: 'auto',
+    });
+    if (fresh(id)) setSubjectPreview(result);
+    return result;
+  }
+  async function updateSubject(mask: Uint8Array, id: number) {
     setHistory((previous) => [...previous.slice(-19), subject]);
     setSubject(mask);
     setShowOriginal(false);
+    return partitionSubject(mask, id);
   }
   function undoSubject() {
     if (!history.length || busy) return;
     setSubject(history[history.length - 1]);
+    setSubjectPreview(null);
     setHistory(history.slice(0, -1));
     setShowOriginal(false);
     setStatus('已撤销上一步主体修改');
+    const restored = history[history.length - 1];
+    if (restored)
+      void run(async (id) => {
+        await partitionSubject(restored, id);
+        if (fresh(id)) setStatus('已撤销主体修改并更新颜色区域');
+      });
   }
   function draw(mask?: Uint8Array) {
     if (!source.current) return;
@@ -95,8 +122,12 @@ export function RecognitionDialog(props: Props) {
       .putImageData(new ImageData(data, source.current.width, source.current.height), 0, 0);
   }
   useEffect(() => {
-    draw(route === 'subject' && subject && !showOriginal ? subject : undefined);
-  }, [ready, subject, showOriginal, route, background, preview]);
+    const selected =
+      subjectColor !== null && subjectPreview
+        ? Uint8Array.from(subjectPreview.labels, (label) => (label === subjectColor ? 1 : 0))
+        : subject;
+    draw(route === 'subject' && selected && !showOriginal ? selected : undefined);
+  }, [ready, subject, subjectColor, subjectPreview, showOriginal, route, background, preview]);
   useEffect(() => {
     setBackground(null);
     setMarkBackground(false);
@@ -178,8 +209,13 @@ export function RecognitionDialog(props: Props) {
         if (!result.mask) throw new Error('模型未返回主体掩膜，请更新模型包');
         const mask = await decode(result.mask);
         if (fresh(id)) {
-          updateSubject(mask);
-          setStatus('主体提取与自动优化已完成');
+          const colors = await updateSubject(mask, id);
+          if (fresh(id))
+            setStatus(
+              colors
+                ? `主体提取与自动优化已完成 · ${colors.regions.filter((r) => r.id !== 1).length} 个主体色区`
+                : '未识别到主体，可点击或画笔补选',
+            );
         }
       }
     });
@@ -197,8 +233,8 @@ export function RecognitionDialog(props: Props) {
       if (!result.mask) throw new Error('模型未返回局部选区');
       const patch = await decode(result.mask);
       if (fresh(id)) {
-        updateSubject(combineSubjectMask(currentMask(), patch, operation));
-        setStatus(`${operation === 'keep' ? '已补选' : '已排除'}点击区域 · 可撤销`);
+        await updateSubject(combineSubjectMask(currentMask(), patch, operation), id);
+        if (fresh(id)) setStatus(`${operation === 'keep' ? '已补选' : '已排除'}点击区域 · 可撤销`);
       }
     });
   }
@@ -249,8 +285,8 @@ export function RecognitionDialog(props: Props) {
           setStatus('框内未识别到主体，可缩小范围或使用画笔补选');
           return;
         }
-        updateSubject(combineSubjectMask(currentMask(), patch, 'keep'));
-        setStatus('已补选框内图案 · 可撤销');
+        await updateSubject(combineSubjectMask(currentMask(), patch, 'keep'), id);
+        if (fresh(id)) setStatus('已补选框内图案 · 可撤销');
       }
     });
   }
@@ -270,18 +306,16 @@ export function RecognitionDialog(props: Props) {
       setStatus('请先选择主体');
       return;
     }
-    props.onApply({
-      version: 1,
-      image: props.image,
-      name: props.name,
-      sizeMm: props.sizeMm,
-      width: source.current.width,
-      height: source.current.height,
-      labels: Array.from(mask, (v, i) => (valid(i) ? (v ? 2 : 1) : 0)),
-      regions: [
-        { id: 1, name: '平面背景', color: '#82897b', layers: 0 },
-        { id: 2, name: '浮雕主体', color: '#d9b477', layers: height },
-      ],
+    void run(async (id) => {
+      const result = subjectPreview || (await partitionSubject(mask, id));
+      if (result && fresh(id))
+        props.onApply({
+          ...result,
+          regions: result.regions.map((region) => ({
+            ...region,
+            layers: region.id === 1 ? 0 : height,
+          })),
+        });
     });
   }
   function point(event: React.PointerEvent) {
@@ -445,8 +479,34 @@ export function RecognitionDialog(props: Props) {
                 <p className="muted">{installed ? '本地 GPU 模型' : '未安装 GPU 模型包'}</p>
                 <label className="stack-field">
                   主体堆叠层数
-                  <NumberField label="主体堆叠层数" value={height} onCommit={setHeight} />
+                  <NumberField
+                    label="主体堆叠层数"
+                    value={height}
+                    disabled={busy}
+                    onCommit={setHeight}
+                  />
                 </label>
+                {subjectPreview && (
+                  <div className="recognition-colors">
+                    <p className="muted">主体颜色 · 点击查看范围</p>
+                    {subjectPreview.regions
+                      .filter((r) => r.id !== 1)
+                      .map((region) => (
+                        <button
+                          key={region.id}
+                          disabled={busy}
+                          aria-pressed={subjectColor === region.id}
+                          onClick={() => {
+                            setShowOriginal(false);
+                            setSubjectColor(subjectColor === region.id ? null : region.id);
+                          }}
+                        >
+                          <span className="swatch" style={{ background: region.color }} />
+                          {region.name}
+                        </button>
+                      ))}
+                  </div>
+                )}
                 <div className="recognition-tools">
                   {(
                     [
@@ -535,6 +595,7 @@ export function RecognitionDialog(props: Props) {
                   toggleBackground(p[0], p[1]);
                   return;
                 }
+                setSubjectColor(null);
                 if (tool === 'keep' || tool === 'remove') {
                   void prompt(p[0], p[1]);
                   return;
@@ -565,7 +626,13 @@ export function RecognitionDialog(props: Props) {
                   void selectBox(box);
                   return;
                 }
-                if (stroke.current) updateSubject(stroke.current);
+                if (stroke.current) {
+                  const mask = stroke.current;
+                  void run(async (id) => {
+                    await updateSubject(mask, id);
+                    if (fresh(id)) setStatus('已修边并更新主体颜色 · 可撤销');
+                  });
+                }
                 stroke.current = null;
                 last.current = null;
               }}
