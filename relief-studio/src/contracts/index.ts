@@ -44,6 +44,7 @@ export interface EditPatch {
   description: string;
   blocks: RasterBlock[];
   properties?: { before: ProjectProperties; after: ProjectProperties };
+  diagnostics?: Record<string, unknown>; // 理由及新增/删除/不确定蒙版，不参与工程提交
 }
 export type OperationResult<T> =
   | { status: 'success'; base: VersionStamp; value: T }
@@ -65,6 +66,8 @@ export interface RecognitionRequest {
   selection?: SelectionMask;
   keepBackground: boolean;
   protectionPolicy: 'preserve' | 'overwrite';
+  prompt?: { points?: { x: number; y: number; label: 0 | 1 }[];
+    box?: [number, number, number, number] };
 }
 export interface ImportRequest {
   requestId: string;
@@ -78,6 +81,14 @@ export interface ExportRequest {
   formats: ('png' | 'jpg')[];
   obj: boolean;
   outputDirectory: string;
+  settings?: OutputSettings; // 独立打印适配，不改变工程几何高度
+}
+export interface OutputSettings {
+  mirror: boolean;
+  rotation: 0 | 90 | 180 | 270;
+  order: 'white-first' | 'color-first';
+  whiteRepeats: number;
+  colorRepeats: number;
 }
 export interface ExportResult {
   outputDirectory: string;

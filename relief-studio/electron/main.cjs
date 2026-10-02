@@ -6,7 +6,8 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const root = path.resolve(__dirname, '..');
-const indexPath = path.join(root, 'dist', 'index.html');
+const indexPath = path.join(root, 'dist', process.argv.includes('--capabilities-demo')
+  ? 'capabilities.html' : 'index.html');
 let mainWindow;
 let busy = false;
 let segmentChild, segmentTask;
@@ -14,7 +15,12 @@ let segmentCanceled = false;
 const subject = require('./subject.cjs')(app, root);
 app.on('before-quit', () => subject.stop());
 
-function engineCommand() {
+function engineCommand(action) {
+  if (!app.isPackaged && ['recognition', 'import'].includes(action)) {
+    const gpu = path.join(root, '.gpu-venv', 'Scripts', 'python.exe');
+    if (require('node:fs').existsSync(gpu))
+      return [gpu, [path.join(root, 'engine', 'main.py')]];
+  }
   return app.isPackaged
     ? [path.join(process.resourcesPath, 'engine', 'relief-engine.exe'), []]
     : [path.join(root, '.venv', 'Scripts', 'python.exe'), [path.join(root, 'engine', 'main.py')]];
@@ -102,6 +108,11 @@ async function chooseSave(defaultPath, filters) {
 }
 
 function registerHandlers() {
+  require('./v2.cjs')({ handle, engineCommand, chooseSave,
+    chooseOpen: () => dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'], filters: [{ name: '浮雕工程', extensions: ['json'] }],
+    }),
+  });
   handle(
     'relief:segment-cancel',
     async () => {

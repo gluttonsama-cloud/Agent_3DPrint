@@ -1,5 +1,17 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+contextBridge.exposeInMainWorld('reliefV2', Object.freeze({
+  height: (request) => ipcRenderer.invoke('v2:height', request),
+  recognition: (request) => ipcRenderer.invoke('v2:recognition', request),
+  export: (request) => ipcRenderer.invoke('v2:export', request),
+  save: (request) => ipcRenderer.invoke('v2:save', request),
+  open: (request) => ipcRenderer.invoke('v2:open', request),
+  migrate: (request) => ipcRenderer.invoke('v2:migrate', request),
+  import: (request) => ipcRenderer.invoke('v2:import', request),
+  cancel: (request) => ipcRenderer.invoke('v2:cancel', request),
+  progress: (request) => ipcRenderer.invoke('v2:progress', request),
+}));
+
 contextBridge.exposeInMainWorld(
   'relief',
   Object.freeze({

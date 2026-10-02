@@ -16,14 +16,19 @@ def main():
   started = time.perf_counter()
   try:
     job_path = Path(args.job)
-    if job_path.stat().st_size > 64_000_000:
+    if job_path.stat().st_size > 144 * 1024 * 1024:
       raise ValueError('任务文件过大')
     job = json.loads(job_path.read_text('utf-8-sig'))
     if not isinstance(job, dict):
       raise ValueError('任务必须为 JSON 对象')
     action = job.get('action', 'export')
     output = Path(args.out).resolve()
-    if action == 'segment':
+    if action.startswith('v2:'):
+      from v2_dispatch import execute_v2
+      result = execute_v2(job)
+      output.mkdir(parents=True, exist_ok=False)
+      write_json(output/'result.json', result)
+    elif action == 'segment':
       project = segment(job)
       output.mkdir(parents=True, exist_ok=False)
       write_json(output/'project.json', project)

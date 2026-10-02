@@ -2,6 +2,7 @@ node_modules/
 .venv/
 .sam-venv/
 .gpu-venv/
+model-runtime/
 dist/
 release/
 build/

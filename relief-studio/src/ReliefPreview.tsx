@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Project } from './types';
+import type { ProjectSnapshot } from './contracts';
 import { previewData } from './preview-model';
 
 export interface PreviewCamera {
@@ -14,12 +15,13 @@ export function ReliefPreview({
   comparison,
   comparisonTarget,
 }: {
-  project: Project;
+  project: Project | ProjectSnapshot;
   cameraState?: { current: PreviewCamera | null };
-  comparison?: Project;
+  comparison?: Project | ProjectSnapshot;
   comparisonTarget?: number;
 }) {
   const container = useRef<HTMLDivElement>(null);
+  const rememberedCamera = useRef<PreviewCamera | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
     const host = container.current!;
@@ -45,11 +47,16 @@ export function ReliefPreview({
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 1000);
     camera.position.set(65, 90, 112);
     const controls = new OrbitControls(camera, renderer.domElement);
-    if (cameraState?.current) {
-      camera.position.fromArray(cameraState.current.position);
-      controls.target.fromArray(cameraState.current.target);
+    const savedCamera = cameraState?.current ?? rememberedCamera.current;
+    if (savedCamera) {
+      camera.position.fromArray(savedCamera.position);
+      controls.target.fromArray(savedCamera.target);
     }
     const rememberCamera = () => {
+      rememberedCamera.current = {
+        position: camera.position.toArray() as [number, number, number],
+        target: controls.target.toArray() as [number, number, number],
+      };
       if (cameraState)
         cameraState.current = {
           position: camera.position.toArray() as [number, number, number],
@@ -73,7 +80,8 @@ export function ReliefPreview({
       for (let x = 0; x < w; x++) {
         const source = y * w + x;
         visible[y * w + x] = project.labels[source] ? 1 : 0;
-        z[y * w + x] = 0.25 + heights[source] * 0.22;
+        z[y * w + x] = project.version === 2
+          ? data.millimeters[source] * physicalScale : 0.25 + heights[source] * 0.22;
       }
     const positions: number[] = [],
       uvs: number[] = [];
@@ -163,7 +171,10 @@ export function ReliefPreview({
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geometry.computeVertexNormals();
-    const texture = new THREE.TextureLoader().load(project.image);
+    const texture = project.version === 2
+      ? new THREE.DataTexture(project.colors.slice(), w, h, THREE.RGBAFormat)
+      : new THREE.TextureLoader().load(project.image);
+    if (project.version === 2) { texture.flipY = true; texture.needsUpdate = true; }
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.magFilter = THREE.NearestFilter;
     const material = new THREE.MeshStandardMaterial({
@@ -185,7 +196,7 @@ export function ReliefPreview({
     const addedVertices: number[] = [],
       removedEdges: number[] = [];
     if (comparison && comparisonTarget !== undefined) {
-      const oldLevels = new Map(comparison.regions.map((r) => [r.id, r.layers]));
+      const oldData = previewData(comparison);
       for (let y = 0; y < h; y++)
         for (let x = 0; x < w; x++) {
           const i = y * w + x;
@@ -207,7 +218,8 @@ export function ReliefPreview({
               [px(x + 1), top, py(y)],
             );
           } else if (comparison.labels[i] === comparisonTarget) {
-            const top = 0.275 + (oldLevels.get(comparisonTarget) || 0) * 0.22;
+            const top = comparison.version === 2 ? oldData.millimeters[i] * physicalScale + 0.025
+              : 0.275 + oldData.heights[i] * 0.22;
             const removed = (n: number) =>
               comparison.labels[n] === comparisonTarget && project.labels[n] !== comparisonTarget;
             if (x === 0 || !removed(i - 1))
