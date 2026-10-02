@@ -4,6 +4,9 @@
 状态：类型、栅格编解码、参考应用器、模拟接口可运行；等待 B 的 D1 对接，尚未冻结。
 当前产品仍使用 v1；本文件不表示 Python 持久化、真实算法、IPC 或新面板已接入。
 
+2026-10-02 更新：独立 Python 编解码及内存迁移已实现，字段保持不变。
+见 [A2 Python 模块记录](2026-10-02-plan-a-python-codec.md)。产品保存入口仍未接入。
+
 ## 唯一类型入口
 
 使用 `src/contracts/index.ts`。旧 `src/types.ts` 保留 v1，A2 通过适配器迁移，
@@ -74,8 +77,8 @@ payload.snapshot 的五个数组及 selection.data 均用 EncodedRaster，
 ## 编解码和样例
 
 `raster-codec.ts` 明确逐元素小端写入，不依赖宿主字节序；拒绝不规范 Base64、
-类型和长度不符。完整 JSON 的 128 MiB 限制、工程语义校验、Python 对等实现、
-v1 迁移及原子保存属于 A2，本轮没有实现完整工程读取器。
+类型和长度不符。A2 的独立 Python 模块已实现完整 JSON 的 128 MiB 限制、工程语义校验、
+对等栅格编解码和 v1 内存迁移；TS 工程读取器、原子保存及桌面接入尚未完成。
 
 公共样例位于 `tests/fixtures/v2/`：
 
