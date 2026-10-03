@@ -24,7 +24,16 @@ export interface SegmentInput {
   sizeMm: [number, number];
   name: string;
 }
+export interface StlOptions {
+  repairDiagonalContacts?: boolean;
+  layerHeightMm: number;
+  baseThicknessMm: number;
+}
 export interface Bridge {
+  exportStl(input: {
+    project: Project;
+    options: StlOptions;
+  }): Promise<{ path: string; repairedPixels?: number } | null>;
   refine(input: {
     id: string;
     project: Project;

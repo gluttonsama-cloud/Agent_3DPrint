@@ -41,6 +41,9 @@ def main():
       validate_project(job.get('project'))
     elif action == 'export':
       export_project(job.get('project'), output)
+    elif action == 'stl':
+      from stl_export import export_stl
+      export_stl(job.get('project'), output, job.get('options', {}))
     else:
       raise ValueError('未知任务类型')
     print(json.dumps({'ok': True, 'path': str(output),

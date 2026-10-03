@@ -8,6 +8,8 @@ import { ReliefPreview } from './ReliefPreview';
 import { NameField, NumberField } from './Fields';
 import { mergeRegions, nextRegionId, projectStats } from './model';
 import { regionSelection, type SelectionOperation } from './selection';
+import { trimRegion } from './trim';
+import { StlDialog } from './StlDialog';
 import { loadImage, readRaster } from './image';
 
 function bridge() {
@@ -15,6 +17,9 @@ function bridge() {
   return window.relief;
 }
 const tools: { id: Tool; name: string; key: string; icon: string }[] = [
+  { id: 'smart', name: '智能点选', key: 'S', icon: '✦' },
+  { id: 'rectangle', name: '框选', key: 'R', icon: '□' },
+  { id: 'lasso', name: '圈选', key: 'L', icon: '⬡' },
   { id: 'color', name: '同色选区', key: 'W', icon: '◉' },
   { id: 'connected', name: '连通选区', key: 'C', icon: '⌖' },
   { id: 'brush', name: '画笔', key: 'B', icon: '╱' },
@@ -32,7 +37,13 @@ export default function App() {
     [error, setError] = useState('');
   const running = useRef(false);
   const [selected, setSelected] = useState(1),
-    [tool, setTool] = useState<Tool>('color');
+    [tool, setTool] = useState<Tool>('smart');
+  const [advanced, setAdvanced] = useState(false);
+  const [snapEdges, setSnapEdges] = useState(true);
+  const [tolerance, setTolerance] = useState(24);
+  const [stl, setStl] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selectionReset, setSelectionReset] = useState(0);
   const [selection, setSelection] = useState<number[]>([]),
     [operation, setOperation] = useState<SelectionOperation>('replace');
   const [radius, setRadius] = useState(5),
@@ -64,6 +75,11 @@ export default function App() {
     ...(project?.regions
       .filter((item) => (counts.get(item.id) || 0) > 0)
       .map((item) => item.layers) || []),
+  );
+  const selectedCount = useMemo(
+    () =>
+      project ? selection.reduce((n, i) => n + (project.labels[i] === selected ? 1 : 0), 0) : 0,
+    [project, selected, selection],
   );
   const currentLayer = Math.min(layer, Math.max(1, maxLayer));
   useEffect(() => setColorDraft(region?.color || '#808080'), [region?.id, region?.color]);
@@ -109,6 +125,9 @@ export default function App() {
     setView('edit');
     setZoom(1);
     setLayer(1);
+    setTool('smart');
+    setAdvanced(false);
+    setOperation('replace');
   }
   async function run(label: string, action: () => Promise<void>) {
     if (running.current) return;
@@ -183,6 +202,7 @@ export default function App() {
     setProject(previous);
     setPast(past.slice(0, -1));
     setSelection([]);
+    setSelectionReset((value) => value + 1);
     if (!previous.regions.some((item) => item.id === selected)) setSelected(previous.regions[0].id);
   }
   function redo() {
@@ -191,16 +211,19 @@ export default function App() {
     setProject(future[0]);
     setFuture(future.slice(1));
     setSelection([]);
+    setSelectionReset((value) => value + 1);
     if (!future[0].regions.some((item) => item.id === selected))
       setSelected(future[0].regions[0].id);
   }
   function selectRegion(id: number) {
+    setSelectionReset((value) => value + 1);
     setSelected(id);
     setMode('regions');
     setView('edit');
     setTarget(0);
     setMergeTarget(0);
-    if (project) setSelection(regionSelection(project.labels, id));
+    if (project) setSelection(advanced ? regionSelection(project.labels, id) : []);
+    if (!advanced) setOperation('replace');
   }
   function assign(targetId: number, newRegion = false) {
     if (!project || !selection.length) return;
@@ -222,6 +245,19 @@ export default function App() {
     setSelection([]);
     setTarget(0);
     setNotice('选区已分配');
+  }
+  function trimSelection(action: 'clear' | 'keep') {
+    if (!project || !selectedCount || selecting) return;
+    const next = trimRegion(project, selected, selection, action);
+    if (next === project) {
+      setNotice('当前层没有需要清除的像素');
+      return;
+    }
+    edit(next);
+    setSelection([]);
+    setNotice(
+      action === 'clear' ? '已清除当前层圈内部分 · 可撤销' : '当前层已只保留圈内部分 · 可撤销',
+    );
   }
   function excludeSelection() {
     if (!project || !selection.length) return;
@@ -261,7 +297,7 @@ export default function App() {
   }
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (busy || crop || pending || recognition) return;
+      if (busy || crop || pending || recognition || stl) return;
       const element = event.target as HTMLElement;
       if (element.closest('input,select,textarea,[contenteditable="true"]')) return;
       const key = event.key.toLowerCase(),
@@ -284,11 +320,13 @@ export default function App() {
         setSelection([]);
       } else if (key === 'delete') {
         event.preventDefault();
-        excludeSelection();
+        if (advanced) excludeSelection();
+        else trimSelection('clear');
       } else if (!ctrl) {
         const found = tools.find((item) => item.key.toLowerCase() === key);
         if (found) {
           setTool(found.id);
+          if (!['smart', 'rectangle', 'lasso', 'hand'].includes(found.id)) setAdvanced(true);
           setMode('regions');
           setView('edit');
         }
@@ -314,6 +352,15 @@ export default function App() {
           </button>
           <button onClick={save} disabled={!project || disabled} title="保存工程 Ctrl+S">
             保存工程
+          </button>
+          <button
+            disabled={!project || disabled}
+            onClick={() => {
+              setError('');
+              setStl(true);
+            }}
+          >
+            导出 STL
           </button>
           <button
             className="primary"
@@ -531,27 +578,66 @@ export default function App() {
           ) : (
             <>
               <div className="edit-tools">
-                {tools.map((item) => (
-                  <button
-                    key={item.id}
-                    aria-label={item.name}
-                    aria-pressed={tool === item.id}
-                    title={`${item.name} (${item.key})`}
-                    className={tool === item.id ? 'active' : ''}
-                    disabled={disabled}
-                    onClick={() => {
-                      setTool(item.id);
-                      setMode('regions');
-                    }}
-                  >
-                    <span aria-hidden="true">{item.icon}</span>
-                    {item.name}
-                  </button>
-                ))}
+                {tools
+                  .filter(
+                    (item) => advanced || ['smart', 'rectangle', 'lasso', 'hand'].includes(item.id),
+                  )
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      aria-label={item.name}
+                      aria-pressed={tool === item.id}
+                      title={`${item.name} (${item.key})`}
+                      className={tool === item.id ? 'active' : ''}
+                      disabled={disabled}
+                      onClick={() => {
+                        setTool(item.id);
+                        setMode('regions');
+                      }}
+                    >
+                      <span aria-hidden="true">{item.icon}</span>
+                      {item.name}
+                    </button>
+                  ))}
+                <button
+                  className="more-tools"
+                  aria-pressed={advanced}
+                  onClick={() => {
+                    setAdvanced(!advanced);
+                    setTool('smart');
+                    setSelection([]);
+                  }}
+                >
+                  更多工具
+                </button>
               </div>
               <div className="tool-options">
-                {tool === 'color' || tool === 'connected' ? (
+                {['smart', 'lasso', 'rectangle', 'color', 'connected'].includes(tool) ? (
                   <>
+                    {tool === 'lasso' && (
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={snapEdges}
+                          onChange={(event) => setSnapEdges(event.target.checked)}
+                        />
+                        自动贴边
+                      </label>
+                    )}
+                    {tool === 'smart' && (
+                      <label>
+                        选取宽容度
+                        <input
+                          aria-label="选取宽容度"
+                          type="range"
+                          min={1}
+                          max={80}
+                          value={tolerance}
+                          onChange={(event) => setTolerance(Number(event.target.value))}
+                        />
+                        <span>{tolerance}</span>
+                      </label>
+                    )}
                     <label>
                       选取方式
                       <select
@@ -566,7 +652,15 @@ export default function App() {
                       </select>
                     </label>
                     <span className="tool-description">
-                      {tool === 'color' ? '选取同一分区的所有像素' : '仅选取相邻的同区像素'}
+                      {tool === 'smart'
+                        ? '点击当前层图案，自动沿相近颜色选取'
+                        : tool === 'rectangle'
+                          ? '拖出矩形范围'
+                          : tool === 'lasso'
+                            ? '沿轮廓附近圈选，松开后自动贴边'
+                            : tool === 'color'
+                              ? '选取同一分区的所有像素'
+                              : '仅选取相邻的同区像素'}
                     </span>
                   </>
                 ) : tool === 'hand' ? (
@@ -614,6 +708,11 @@ export default function App() {
               <div className="art-stage" style={{ pointerEvents: disabled ? 'none' : 'auto' }}>
                 <EditorCanvas
                   project={project}
+                  simple={!advanced}
+                  snapEdges={snapEdges}
+                  tolerance={tolerance}
+                  onSelecting={setSelecting}
+                  selectionReset={selectionReset}
                   selected={selected}
                   tool={tool}
                   radius={radius}
@@ -624,6 +723,7 @@ export default function App() {
                   selection={selection}
                   onSelect={setSelected}
                   onSelection={(indices) => {
+                    setError('');
                     setSelection(indices);
                     setMode('regions');
                     setTarget(0);
@@ -642,8 +742,11 @@ export default function App() {
                     : '未选择像素'}
                 </span>
                 <button
-                  disabled={!selection.length || disabled}
-                  onClick={() => setSelection([])}
+                  disabled={(!selection.length && !selecting) || disabled}
+                  onClick={() => {
+                    setSelection([]);
+                    setSelectionReset((value) => value + 1);
+                  }}
                   title="Ctrl+D / Esc"
                 >
                   取消选区
@@ -714,173 +817,217 @@ export default function App() {
         </section>
         <aside className="right-panel sidebar">
           <div className="properties-scroll">
-            <section className="sidebar-section">
-              <h2>区域属性</h2>
-              {project && region ? (
-                <>
-                  <label className="stack-field">
-                    名称
-                    <NameField
-                      value={region.name}
-                      disabled={disabled}
-                      onCommit={(name) => updateRegion({ name })}
-                    />
-                  </label>
-                  <div className="field-row">
-                    <label>堆叠层数</label>
-                    <div className="stepper">
-                      <button
-                        aria-label="减少层数"
-                        disabled={disabled || region.layers === 0}
-                        onClick={() => updateRegion({ layers: region.layers - 1 })}
-                      >
-                        −
-                      </button>
-                      <NumberField
-                        label="区域层数"
-                        value={region.layers}
-                        disabled={disabled}
-                        onCommit={(layers) => updateRegion({ layers })}
-                      />
-                      <button
-                        aria-label="增加层数"
-                        disabled={disabled || region.layers === 256}
-                        onClick={() => updateRegion({ layers: region.layers + 1 })}
-                      >
-                        ＋
-                      </button>
-                    </div>
-                  </div>
-                  <div className="height-presets">
-                    {[0, 5, 10, 20].map((value) => (
-                      <button
-                        key={value}
-                        disabled={disabled}
-                        onClick={() => updateRegion({ layers: value })}
-                      >
-                        {value} 层
-                      </button>
-                    ))}
-                  </div>
-                  <div className="field-row">
-                    <label htmlFor="region-color">图案颜色</label>
-                    <div className="color-control">
-                      <input
-                        id="region-color"
-                        aria-label="区域颜色"
-                        type="color"
-                        value={colorDraft}
-                        disabled={disabled}
-                        onChange={(event) => setColorDraft(event.target.value)}
-                      />
-                      <span>{colorDraft.toUpperCase()}</span>
-                    </div>
-                  </div>
-                  <button
-                    className="full-button"
-                    disabled={disabled || colorDraft === region.color}
-                    onClick={recolor}
-                  >
-                    应用颜色到区域
-                  </button>
-                </>
-              ) : (
-                <p className="empty-sidebar">选择区域以编辑属性</p>
-              )}
-            </section>
             {project && (
-              <section className="sidebar-section selection-properties">
-                <h2>
-                  选区操作{' '}
-                  <small>
-                    {selection.length ? `${selection.length.toLocaleString()} px` : '无选区'}
-                  </small>
-                </h2>
-                <label className="stack-field">
-                  分配到区域
-                  <select
-                    aria-label="分配目标"
-                    disabled={disabled || !selection.length}
-                    value={target}
-                    onChange={(event) => setTarget(Number(event.target.value))}
+              <section className="sidebar-section trim-panel">
+                <h2>修整当前层</h2>
+                <p className="current-layer-name">
+                  {region?.name} · {region?.layers} 层
+                </p>
+                <ol className="simple-steps">
+                  <li>左侧选择要修整的层</li>
+                  <li>点选图案，或圈出范围</li>
+                  <li>选择清除或保留</li>
+                </ol>
+                <div className="trim-actions">
+                  <button
+                    disabled={disabled || selecting || !selectedCount}
+                    onClick={() => trimSelection('clear')}
                   >
-                    <option value={0}>选择目标区域</option>
-                    {project.regions.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} · {item.layers} 层
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  className="full-button"
-                  disabled={disabled || !selection.length || !target}
-                  onClick={() => assign(target)}
-                >
-                  应用分配
-                </button>
-                <button
-                  className="full-button"
-                  disabled={disabled || !selection.length || project.regions.length >= 32}
-                  onClick={() => assign(nextRegionId(project.regions), true)}
-                >
-                  选区建立新区域
-                </button>
-                <button
-                  className="text-button danger"
-                  disabled={disabled || !selection.length}
-                  onClick={excludeSelection}
-                >
-                  排除选区 <kbd>Delete</kbd>
-                </button>
+                    清除
+                  </button>
+                  <button
+                    className="primary"
+                    disabled={disabled || selecting || !selectedCount}
+                    onClick={() => trimSelection('keep')}
+                  >
+                    保留
+                  </button>
+                </div>
+                <p>
+                  <b>清除：</b>去掉当前层选中部分。
+                  <br />
+                  <b>保留：</b>只留下当前层选中部分。
+                </p>
+                <small aria-live="polite">
+                  {selecting
+                    ? '正在识别选区…'
+                    : selectedCount
+                      ? `当前层选中 ${selectedCount.toLocaleString()} 像素`
+                      : '选中范围会高亮，确认后再操作'}
+                </small>
+                <small>其他层不变 · 操作后可撤销</small>
               </section>
             )}
-            {project && region && (
+            <details className="advanced-properties" open={advanced || undefined}>
+              <summary>层属性与更多设置</summary>
               <section className="sidebar-section">
-                <h2>合并区域</h2>
-                <label className="stack-field">
-                  将「{region.name}」合并到
-                  <select
-                    aria-label="合并目标"
-                    value={mergeTarget}
-                    disabled={disabled}
-                    onChange={(event) => setMergeTarget(Number(event.target.value))}
-                  >
-                    <option value={0}>选择目标区域</option>
-                    {project.regions
-                      .filter((item) => item.id !== selected)
-                      .map((item) => (
+                <h2>区域属性</h2>
+                {project && region ? (
+                  <>
+                    <label className="stack-field">
+                      名称
+                      <NameField
+                        value={region.name}
+                        disabled={disabled}
+                        onCommit={(name) => updateRegion({ name })}
+                      />
+                    </label>
+                    <div className="field-row">
+                      <label>堆叠层数</label>
+                      <div className="stepper">
+                        <button
+                          aria-label="减少层数"
+                          disabled={disabled || region.layers === 0}
+                          onClick={() => updateRegion({ layers: region.layers - 1 })}
+                        >
+                          −
+                        </button>
+                        <NumberField
+                          label="区域层数"
+                          value={region.layers}
+                          disabled={disabled}
+                          onCommit={(layers) => updateRegion({ layers })}
+                        />
+                        <button
+                          aria-label="增加层数"
+                          disabled={disabled || region.layers === 256}
+                          onClick={() => updateRegion({ layers: region.layers + 1 })}
+                        >
+                          ＋
+                        </button>
+                      </div>
+                    </div>
+                    <div className="height-presets">
+                      {[0, 5, 10, 20].map((value) => (
+                        <button
+                          key={value}
+                          disabled={disabled}
+                          onClick={() => updateRegion({ layers: value })}
+                        >
+                          {value} 层
+                        </button>
+                      ))}
+                    </div>
+                    <div className="field-row">
+                      <label htmlFor="region-color">图案颜色</label>
+                      <div className="color-control">
+                        <input
+                          id="region-color"
+                          aria-label="区域颜色"
+                          type="color"
+                          value={colorDraft}
+                          disabled={disabled}
+                          onChange={(event) => setColorDraft(event.target.value)}
+                        />
+                        <span>{colorDraft.toUpperCase()}</span>
+                      </div>
+                    </div>
+                    <button
+                      className="full-button"
+                      disabled={disabled || colorDraft === region.color}
+                      onClick={recolor}
+                    >
+                      应用颜色到区域
+                    </button>
+                  </>
+                ) : (
+                  <p className="empty-sidebar">选择区域以编辑属性</p>
+                )}
+              </section>
+              {project && (
+                <section className="sidebar-section selection-properties">
+                  <h2>
+                    选区操作{' '}
+                    <small>
+                      {selection.length ? `${selection.length.toLocaleString()} px` : '无选区'}
+                    </small>
+                  </h2>
+                  <label className="stack-field">
+                    分配到区域
+                    <select
+                      aria-label="分配目标"
+                      disabled={disabled || !selection.length}
+                      value={target}
+                      onChange={(event) => setTarget(Number(event.target.value))}
+                    >
+                      <option value={0}>选择目标区域</option>
+                      {project.regions.map((item) => (
                         <option key={item.id} value={item.id}>
                           {item.name} · {item.layers} 层
                         </option>
                       ))}
-                  </select>
-                </label>
-                <button
-                  className="full-button"
-                  disabled={
-                    disabled ||
-                    !mergeTarget ||
-                    mergeTarget === selected ||
-                    !project.regions.some((item) => item.id === mergeTarget)
-                  }
-                  onClick={() => {
-                    edit({
-                      ...project,
-                      labels: mergeRegions(project.labels, selected, mergeTarget),
-                      regions: project.regions.filter((item) => item.id !== selected),
-                    });
-                    setSelected(mergeTarget);
-                    setSelection([]);
-                    setTarget(0);
-                    setMergeTarget(0);
-                    setNotice('区域已合并');
-                  }}
-                >
-                  合并整个区域
-                </button>
-              </section>
-            )}
+                    </select>
+                  </label>
+                  <button
+                    className="full-button"
+                    disabled={disabled || !selection.length || !target}
+                    onClick={() => assign(target)}
+                  >
+                    应用分配
+                  </button>
+                  <button
+                    className="full-button"
+                    disabled={disabled || !selection.length || project.regions.length >= 32}
+                    onClick={() => assign(nextRegionId(project.regions), true)}
+                  >
+                    选区建立新区域
+                  </button>
+                  <button
+                    className="text-button danger"
+                    disabled={disabled || !selection.length}
+                    onClick={excludeSelection}
+                  >
+                    排除选区 <kbd>Delete</kbd>
+                  </button>
+                </section>
+              )}
+              {project && region && (
+                <section className="sidebar-section">
+                  <h2>合并区域</h2>
+                  <label className="stack-field">
+                    将「{region.name}」合并到
+                    <select
+                      aria-label="合并目标"
+                      value={mergeTarget}
+                      disabled={disabled}
+                      onChange={(event) => setMergeTarget(Number(event.target.value))}
+                    >
+                      <option value={0}>选择目标区域</option>
+                      {project.regions
+                        .filter((item) => item.id !== selected)
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name} · {item.layers} 层
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <button
+                    className="full-button"
+                    disabled={
+                      disabled ||
+                      !mergeTarget ||
+                      mergeTarget === selected ||
+                      !project.regions.some((item) => item.id === mergeTarget)
+                    }
+                    onClick={() => {
+                      edit({
+                        ...project,
+                        labels: mergeRegions(project.labels, selected, mergeTarget),
+                        regions: project.regions.filter((item) => item.id !== selected),
+                      });
+                      setSelected(mergeTarget);
+                      setSelection([]);
+                      setTarget(0);
+                      setMergeTarget(0);
+                      setNotice('区域已合并');
+                    }}
+                  >
+                    合并整个区域
+                  </button>
+                </section>
+              )}
+            </details>
           </div>
           <section className="output-summary">
             <h2>输出</h2>
@@ -912,6 +1059,25 @@ export default function App() {
           </button>
         )}
       </footer>
+      {stl && project && (
+        <StlDialog
+          project={project}
+          busy={!!busy}
+          error={error}
+          onCancel={() => setStl(false)}
+          onExport={(options) => {
+            void run('导出 STL', async () => {
+              const result = await bridge().exportStl({ project, options });
+              if (result) {
+                setNotice(
+                  `STL 已导出：${result.path}${result.repairedPixels ? ` · 已修复 ${result.repairedPixels} 个像素连接（原工程不变）` : ''}`,
+                );
+                setStl(false);
+              }
+            });
+          }}
+        />
+      )}
       {recognition && (
         <RecognitionDialog
           {...recognition}
@@ -925,7 +1091,11 @@ export default function App() {
               setMergeTarget(0);
             } else replace(next, true);
             setRecognition(null);
-            setNotice('分区已完成');
+            setTool('smart');
+            setAdvanced(false);
+            setOperation('replace');
+            setView('edit');
+            setNotice('分区已完成 · 选择一层，选范围后清除或保留');
           }}
         />
       )}

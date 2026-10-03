@@ -5,7 +5,23 @@ import path from 'node:path';
 test('主体提取自动分色，原图对照后可选色，修改高度与保存重开保持轮廓', async () => {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [process.cwd()], env });
+  const packaged = env.RELIEF_TEST_PACKAGED === '1';
+  if (packaged) {
+    env.PATH = `${process.env.SystemRoot}\\System32`;
+    delete env.PYTHONHOME;
+    delete env.PYTHONPATH;
+  }
+  const app = await electron.launch(
+    packaged
+      ? {
+          executablePath:
+            env.RELIEF_TEST_EXECUTABLE ||
+            path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'),
+          args: [],
+          env,
+        }
+      : { args: [process.cwd()], env },
+  );
   const page = await app.firstWindow();
   try {
     const fixture = await page.evaluate(() => {

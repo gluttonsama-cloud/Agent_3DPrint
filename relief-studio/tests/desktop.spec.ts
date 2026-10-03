@@ -3,6 +3,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const root = process.cwd();
+test.beforeAll(async () => {
+  await fs.mkdir(path.join(root, 'artifacts'), { recursive: true });
+});
 
 test('区域属性不再显示独立修整入口', async () => {
   const app = await launchDesktop(),
@@ -236,6 +239,7 @@ test('重新识别先预览，取消不修改，应用后整步撤销', async ()
   try {
     await page.getByRole('button', { name: '打开 55 mm 徽标示例' }).click();
     await expect(page.locator('.region-height')).toHaveText(['0 层', '5 层', '10 层']);
+    await expect(page.getByRole('status')).toContainText('示例已打开');
     const recovery = await page.evaluate(async () => {
       const bridge = window.relief!;
       const sample = await bridge.sample();
@@ -281,6 +285,8 @@ test('选区保持原色、追加减选、分配撤销与紧凑窗口', async ()
   try {
     await page.setViewportSize({ width: 1100, height: 720 });
     await page.getByRole('button', { name: '打开 55 mm 徽标示例' }).click();
+    await page.getByRole('button', { name: '更多工具', exact: true }).click();
+    await page.getByRole('button', { name: '同色选区', exact: true }).click();
     const art = page.getByLabel('图案编辑画布');
     await expect(art).toHaveAttribute('data-ready', 'true');
     const sample = JSON.parse(
@@ -447,6 +453,7 @@ test('离线桌面：样例编辑、3D、撤销、保存重开、导出', async 
     await page.getByRole('button', { name: '打开 55 mm 徽标示例' }).click();
     await expect(page.getByRole('heading', { name: '科尔沁 · 55 mm 徽标' })).toBeVisible();
     await page.getByRole('button', { name: /白字 · 凸起/ }).click();
+    await page.locator('.advanced-properties > summary').click();
     await expect(page.getByLabel('区域层数', { exact: true })).toHaveValue('10');
     await page.getByLabel('区域层数', { exact: true }).fill('15');
     await page.getByLabel('区域层数', { exact: true }).press('Enter');
@@ -525,6 +532,7 @@ test('导入、圆形裁剪、分区、画笔擦除与撤销', async () => {
     await page.getByRole('button', { name: '应用识别结果', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('分区已完成');
     await expect(page.locator('.region-card')).toHaveCount(3);
+    await page.getByRole('button', { name: '更多工具', exact: true }).click();
     await page.getByRole('button', { name: '擦除', exact: true }).click();
     const art = page.getByLabel('图案编辑画布');
     const artBox = (await art.boundingBox())!;

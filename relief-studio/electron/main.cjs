@@ -102,6 +102,24 @@ async function chooseSave(defaultPath, filters) {
 }
 
 function registerHandlers() {
+  handle('relief:export-stl', async (input) => {
+    const result = await chooseSave('浮雕模型.stl', [{ name: 'STL 模型', extensions: ['stl'] }]);
+    if (result.canceled || !result.filePath) return null;
+    const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'relief-stl-'));
+    const output = path.join(temporary, 'output');
+    const target = result.filePath;
+    const staged = `${target}.tmp-${Date.now()}`;
+    try {
+      await runEngine({ action: 'stl', project: input?.project, options: input?.options }, output);
+      const info = JSON.parse(await fs.readFile(path.join(output, 'mesh-info.json'), 'utf8'));
+      await fs.copyFile(path.join(output, 'model.stl'), staged);
+      await fs.rename(staged, target);
+      return { path: target, repairedPixels: info.repairedPixels };
+    } finally {
+      await fs.rm(staged, { force: true });
+      await fs.rm(temporary, { recursive: true, force: true });
+    }
+  });
   handle(
     'relief:segment-cancel',
     async () => {
