@@ -78,6 +78,84 @@ select:disabled {
 .header-actions .primary {
   padding-inline: 22px;
 }
+.header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.header-actions .history-buttons button {
+  padding-inline: 10px;
+}
+.workflow-stages {
+  display: flex;
+  gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.workflow-stages [aria-current='step'] {
+  color: var(--accent);
+  font-weight: 600;
+}
+.workspace-tools .edit-tools {
+  display: grid;
+  height: auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0;
+  border: 0;
+  gap: 4px;
+}
+.left-panel {
+  overflow-y: auto;
+}
+.workspace-tools {
+  flex: none;
+}
+.workspace-tools .edit-tools button {
+  justify-content: flex-start;
+  min-width: 0;
+  margin: 0;
+}
+.sidebar-preview {
+  border-bottom: 1px solid var(--line);
+}
+.sidebar-preview summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.sidebar-preview-stage {
+  display: flex;
+  height: 230px;
+  margin: 0 8px 12px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.sidebar-preview .preview-hint {
+  width: calc(100% - 16px);
+  box-sizing: border-box;
+  white-space: normal;
+  font-size: 10px;
+  bottom: 6px;
+  text-align: center;
+}
+@media (max-width: 1150px) {
+  .app-header {
+    height: auto;
+    min-height: 62px;
+    padding-block: 8px;
+    gap: 8px;
+  }
+  .header-actions button {
+    padding-inline: 8px;
+  }
+  .brand-subtitle,
+  .workflow-stages {
+    display: none;
+  }
+}
 .document-bar {
   height: 40px;
   background: #f5f5ef;

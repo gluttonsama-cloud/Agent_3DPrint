@@ -4,13 +4,14 @@ import { RecognitionDialog } from './RecognitionDialog';
 import './recognition.css';
 import { CropDialog } from './CropDialog';
 import { EditorCanvas, type Tool } from './EditorCanvas';
-import { ReliefPreview } from './ReliefPreview';
+import { ReliefPreview, type PreviewCamera } from './ReliefPreview';
 import { NameField, NumberField } from './Fields';
 import { mergeRegions, nextRegionId, projectStats } from './model';
 import { regionSelection, type SelectionOperation } from './selection';
 import { trimRegion } from './trim';
 import { StlDialog } from './StlDialog';
 import { loadImage, readRaster } from './image';
+import { isEditingTarget } from './editor/viewport';
 
 function bridge() {
   if (!window.relief) throw new Error('此操作需要桌面版。请在 Relief Studio 中打开工程。');
@@ -32,6 +33,7 @@ export default function App() {
   const [past, setPast] = useState<Project[]>([]),
     [future, setFuture] = useState<Project[]>([]);
   const saved = useRef<Project | null>(null);
+  const previewCamera = useRef<PreviewCamera | null>(null);
   const [busy, setBusy] = useState(''),
     [notice, setNotice] = useState('就绪'),
     [error, setError] = useState('');
@@ -114,6 +116,7 @@ export default function App() {
       });
   }
   function replace(next: Project, isNew = false) {
+    previewCamera.current = null;
     saved.current = isNew ? null : next;
     setProject(next);
     setPast([]);
@@ -298,8 +301,7 @@ export default function App() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (busy || crop || pending || recognition || stl) return;
-      const element = event.target as HTMLElement;
-      if (element.closest('input,select,textarea,[contenteditable="true"]')) return;
+      if (event.isComposing || isEditingTarget(event.target)) return;
       const key = event.key.toLowerCase(),
         ctrl = event.ctrlKey || event.metaKey;
       if (ctrl && key === 's') {
@@ -318,6 +320,7 @@ export default function App() {
       } else if ((ctrl && key === 'd') || key === 'escape') {
         event.preventDefault();
         setSelection([]);
+        setSelectionReset((value) => value + 1);
       } else if (key === 'delete') {
         event.preventDefault();
         if (advanced) excludeSelection();
@@ -328,7 +331,6 @@ export default function App() {
           setTool(found.id);
           if (!['smart', 'rectangle', 'lasso', 'hand'].includes(found.id)) setAdvanced(true);
           setMode('regions');
-          setView('edit');
         }
       }
     };
@@ -347,9 +349,30 @@ export default function App() {
           <span className="brand-subtitle">浮雕制版</span>
         </div>
         <div className="header-actions">
+          <button onClick={() => file.current?.click()} disabled={disabled}>
+            导入图片
+          </button>
           <button onClick={open} disabled={disabled} title="打开工程 Ctrl+O">
             打开工程
           </button>
+          <div className="history-buttons">
+            <button
+              aria-label="撤销"
+              title="撤销 Ctrl+Z"
+              disabled={!past.length || disabled}
+              onClick={undo}
+            >
+              ↶
+            </button>
+            <button
+              aria-label="重做"
+              title="重做 Ctrl+Shift+Z"
+              disabled={!future.length || disabled}
+              onClick={redo}
+            >
+              ↷
+            </button>
+          </div>
           <button onClick={save} disabled={!project || disabled} title="保存工程 Ctrl+S">
             保存工程
           </button>
@@ -384,6 +407,11 @@ export default function App() {
             {project ? (dirty ? '未保存' : '已保存') : ''}
           </span>
         </div>
+        <ol className="workflow-stages" aria-label="工作阶段">
+          <li aria-current={!project ? 'step' : undefined}>导入</li>
+          <li aria-current={project && !busy.startsWith('导出') ? 'step' : undefined}>编辑</li>
+          <li aria-current={busy.startsWith('导出') ? 'step' : undefined}>输出</li>
+        </ol>
         {project && (
           <span className="document-meta">
             {project.width} × {project.height} px<span>·</span>
@@ -393,6 +421,45 @@ export default function App() {
       </div>
       <main className="workspace">
         <aside className="left-panel sidebar">
+          {project && (
+            <section className="sidebar-section workspace-tools">
+              <h2>编辑工具</h2>
+              <div className="edit-tools">
+                {tools
+                  .filter(
+                    (item) => advanced || ['smart', 'rectangle', 'lasso', 'hand'].includes(item.id),
+                  )
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      aria-label={item.name}
+                      aria-pressed={tool === item.id}
+                      title={`${item.name} (${item.key})`}
+                      className={tool === item.id ? 'active' : ''}
+                      disabled={disabled}
+                      onClick={() => {
+                        setTool(item.id);
+                        setMode('regions');
+                      }}
+                    >
+                      <span aria-hidden="true">{item.icon}</span>
+                      {item.name}
+                    </button>
+                  ))}
+                <button
+                  className="more-tools"
+                  aria-pressed={advanced}
+                  onClick={() => {
+                    setAdvanced(!advanced);
+                    setTool('smart');
+                    setSelection([]);
+                  }}
+                >
+                  更多工具
+                </button>
+              </div>
+            </section>
+          )}
           <section className="sidebar-section">
             <h2>源图像</h2>
             <button
@@ -523,38 +590,16 @@ export default function App() {
         <section className="center-panel">
           <div className="canvas-toolbar">
             <div className="view-tabs">
-              <button
-                className={view === 'edit' ? 'active' : ''}
-                aria-pressed={view === 'edit'}
-                onClick={() => setView('edit')}
-              >
+              <button className="active" aria-pressed={true} onClick={() => setView('edit')}>
                 平面编辑
               </button>
               <button
                 className={view === 'preview' ? 'active' : ''}
                 aria-pressed={view === 'preview'}
                 disabled={!project}
-                onClick={() => setView('preview')}
+                onClick={() => setView(view === 'preview' ? 'edit' : 'preview')}
               >
                 3D 浮雕
-              </button>
-            </div>
-            <div className="history-buttons">
-              <button
-                aria-label="撤销"
-                title="撤销 Ctrl+Z"
-                disabled={!past.length || disabled}
-                onClick={undo}
-              >
-                ↶
-              </button>
-              <button
-                aria-label="重做"
-                title="重做 Ctrl+Shift+Z"
-                disabled={!future.length || disabled}
-                onClick={redo}
-              >
-                ↷
               </button>
             </div>
           </div>
@@ -573,44 +618,8 @@ export default function App() {
               </button>
               <small>支持 PNG、JPEG · 最大 24 MB</small>
             </div>
-          ) : view === 'preview' ? (
-            <ReliefPreview project={project} />
           ) : (
             <>
-              <div className="edit-tools">
-                {tools
-                  .filter(
-                    (item) => advanced || ['smart', 'rectangle', 'lasso', 'hand'].includes(item.id),
-                  )
-                  .map((item) => (
-                    <button
-                      key={item.id}
-                      aria-label={item.name}
-                      aria-pressed={tool === item.id}
-                      title={`${item.name} (${item.key})`}
-                      className={tool === item.id ? 'active' : ''}
-                      disabled={disabled}
-                      onClick={() => {
-                        setTool(item.id);
-                        setMode('regions');
-                      }}
-                    >
-                      <span aria-hidden="true">{item.icon}</span>
-                      {item.name}
-                    </button>
-                  ))}
-                <button
-                  className="more-tools"
-                  aria-pressed={advanced}
-                  onClick={() => {
-                    setAdvanced(!advanced);
-                    setTool('smart');
-                    setSelection([]);
-                  }}
-                >
-                  更多工具
-                </button>
-              </div>
               <div className="tool-options">
                 {['smart', 'lasso', 'rectangle', 'color', 'connected'].includes(tool) ? (
                   <>
@@ -707,6 +716,7 @@ export default function App() {
               </div>
               <div className="art-stage" style={{ pointerEvents: disabled ? 'none' : 'auto' }}>
                 <EditorCanvas
+                  disabled={disabled || !!(crop || recognition || pending || stl)}
                   project={project}
                   simple={!advanced}
                   snapEdges={snapEdges}
@@ -817,6 +827,20 @@ export default function App() {
         </section>
         <aside className="right-panel sidebar">
           <div className="properties-scroll">
+            {project && (
+              <details
+                className="sidebar-preview"
+                open={view === 'preview'}
+                onToggle={(event) => setView(event.currentTarget.open ? 'preview' : 'edit')}
+              >
+                <summary>3D 预览</summary>
+                {view === 'preview' && (
+                  <div className="sidebar-preview-stage">
+                    <ReliefPreview project={project} cameraState={previewCamera} />
+                  </div>
+                )}
+              </details>
+            )}
             {project && (
               <section className="sidebar-section trim-panel">
                 <h2>修整当前层</h2>
@@ -1049,8 +1073,8 @@ export default function App() {
       <footer className={`statusbar ${error ? 'has-error' : ''}`} role={error ? 'alert' : 'status'}>
         <span title={error || notice}>{busy ? `${busy}…` : error || notice}</span>
         <span>
-          {view === 'edit' && project
-            ? `${tools.find((item) => item.id === tool)?.name} · ${tool === 'color' || tool === 'connected' ? 'Shift 追加 / Alt 减选' : 'Ctrl+Z 撤销'}`
+          {project
+            ? `${tools.find((item) => item.id === tool)?.name} · Space 临时平移 · ${tool === 'color' || tool === 'connected' ? 'Shift 追加 / Alt 减选' : 'Ctrl+Z 撤销'}`
             : 'Relief Studio'}
         </span>
         {error && (

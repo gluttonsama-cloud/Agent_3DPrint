@@ -8,6 +8,7 @@ import {
   type SelectionOperation,
 } from './selection';
 import { loadImage } from './image';
+import { isEditingTarget, screenToImage } from './editor/viewport';
 
 export type Tool =
   | 'color'
@@ -19,6 +20,7 @@ export type Tool =
   | 'lasso'
   | 'rectangle';
 interface Props {
+  disabled?: boolean;
   simple?: boolean;
   snapEdges?: boolean;
   tolerance: number;
@@ -63,6 +65,9 @@ export function EditorCanvas(props: Props) {
   const latest = useRef(props);
   latest.current = props;
   const pan = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const hovered = useRef(false);
+  const spaceHeld = useRef(false);
+  const [temporaryPan, setTemporaryPan] = useState(false);
   const [revision, setRevision] = useState(0);
   const [fit, setFit] = useState(1);
   const [cursor, setCursor] = useState<[number, number] | null>(null);
@@ -124,6 +129,7 @@ export function EditorCanvas(props: Props) {
     };
   }, [project.image, project.width, project.height]);
   useEffect(() => {
+    finish(true);
     request.current = null;
     smartSeed.current = null;
     outline.current = null;
@@ -249,11 +255,14 @@ export function EditorCanvas(props: Props) {
   const point = (event: React.PointerEvent): [number, number] => {
     const box = base.current!.getBoundingClientRect();
     // 圈选使用像素边界坐标，必须允许拖到最右/最下边缘。
-    const inset = tool === 'rectangle' || tool === 'lasso' ? 0 : 1;
-    return [
-      Math.max(0, Math.min(project.width - inset, Math.floor((event.clientX - box.left) / scale))),
-      Math.max(0, Math.min(project.height - inset, Math.floor((event.clientY - box.top) / scale))),
-    ];
+    return screenToImage(
+      event.clientX,
+      event.clientY,
+      box,
+      project.width,
+      project.height,
+      tool === 'rectangle' || tool === 'lasso',
+    );
   };
   function dab(end: [number, number]) {
     if (!stroke.current || !rgba.current) return;
@@ -349,6 +358,13 @@ export function EditorCanvas(props: Props) {
   }
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
+      if (props.disabled || event.isComposing || isEditingTarget(event.target)) return;
+      if (event.code === 'Space' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (!hovered.current || stroke.current || outline.current) return;
+        event.preventDefault();
+        spaceHeld.current = true;
+        setTemporaryPan(true);
+      }
       if (
         event.key === 'Escape' ||
         ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd')
@@ -359,17 +375,53 @@ export function EditorCanvas(props: Props) {
         finish(true);
       }
     };
+    const release = (event: KeyboardEvent) => {
+      if (event.code !== 'Space') return;
+      spaceHeld.current = false;
+      setTemporaryPan(false);
+      // 松开空格后结束平移，不把仍按下的鼠标转成笔画。
+      pan.current = null;
+    };
+    const blur = () => {
+      spaceHeld.current = false;
+      setTemporaryPan(false);
+      request.current = null;
+      smartSeed.current = null;
+      props.onSelecting(false);
+      finish(true);
+    };
     window.addEventListener('keydown', cancel);
-    return () => window.removeEventListener('keydown', cancel);
+    window.addEventListener('keyup', release);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', cancel);
+      window.removeEventListener('keyup', release);
+      window.removeEventListener('blur', blur);
+    };
   });
+  useEffect(() => {
+    if (!props.disabled) return;
+    spaceHeld.current = false;
+    setTemporaryPan(false);
+    finish(true);
+  }, [props.disabled]);
   return (
-    <div className="canvas-viewport" ref={viewport}>
+    <div
+      className="canvas-viewport"
+      ref={viewport}
+      onPointerEnter={() => {
+        hovered.current = true;
+      }}
+      onPointerLeave={() => {
+        hovered.current = false;
+      }}
+    >
       <div
         className="canvas-scroll-area"
         style={{ minWidth: project.width * scale + 80, minHeight: project.height * scale + 80 }}
       >
         <div
-          className={`raster-frame checker tool-${tool}`}
+          className={`raster-frame checker tool-${temporaryPan ? 'hand' : tool}`}
           style={{ width: project.width * scale, height: project.height * scale }}
         >
           <canvas
@@ -381,9 +433,10 @@ export function EditorCanvas(props: Props) {
             data-ready={rgba.current ? 'true' : 'false'}
             style={{ width: project.width * scale, height: project.height * scale }}
             onPointerDown={(event) => {
-              if (!rgba.current || (event.button !== 0 && event.button !== 1)) return;
+              if (props.disabled || !rgba.current || (event.button !== 0 && event.button !== 1))
+                return;
               const p = point(event);
-              if (tool === 'hand' || event.button === 1) {
+              if (tool === 'hand' || spaceHeld.current || event.button === 1) {
                 pan.current = {
                   x: event.clientX,
                   y: event.clientY,
@@ -452,7 +505,7 @@ export function EditorCanvas(props: Props) {
             }}
             onPointerCancel={() => finish(true)}
             onPointerLeave={() => setCursor(null)}
-            onLostPointerCapture={() => finish()}
+            onLostPointerCapture={() => finish(true)}
           />
           <canvas
             ref={focus}
@@ -470,7 +523,7 @@ export function EditorCanvas(props: Props) {
             height={project.height}
             style={{ width: project.width * scale, height: project.height * scale }}
           />
-          {cursor && (tool === 'brush' || tool === 'erase') && (
+          {cursor && !temporaryPan && (tool === 'brush' || tool === 'erase') && (
             <span
               className="brush-cursor"
               style={{
