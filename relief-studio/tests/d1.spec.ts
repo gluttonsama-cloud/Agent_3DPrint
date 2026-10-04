@@ -3,9 +3,23 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { decodeProject } from '../src/project-codec';
 
-test('真实工作台高度接口：保存重开保留逐像素高度及保护，PNG 输出同源', async () => {
+async function launchWorkbench(mock = false) {
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [process.cwd()], env });
+  const args = mock ? ['--d1'] : [];
+  const packaged = env.RELIEF_TEST_PACKAGED === '1';
+  if (packaged) {
+    env.PATH = `${process.env.SystemRoot}\\System32`;
+    delete env.PYTHONHOME; delete env.PYTHONPATH;
+  }
+  const app = await electron.launch(packaged ? {
+    executablePath: env.RELIEF_TEST_EXECUTABLE || path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), args, env,
+  } : { args: [process.cwd(), ...args], env });
+  expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(packaged);
+  return app;
+}
+
+test('真实工作台高度接口：保存重开保留逐像素高度及保护，PNG 输出同源', async () => {
+  const app = await launchWorkbench();
   const page = await app.firstWindow();
   const directory = path.join(process.cwd(), 'artifacts', `d1-real-${Date.now()}`);
   await fs.mkdir(directory, { recursive: true });
@@ -44,8 +58,7 @@ test('真实工作台高度接口：保存重开保留逐像素高度及保护�
 });
 
 test('D1 实际工作台：候选、历史、预览、取消和过期返回', async () => {
-  const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [process.cwd(), '--d1'], env });
+  const app = await launchWorkbench(true);
   const page = await app.firstWindow();
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   try {
