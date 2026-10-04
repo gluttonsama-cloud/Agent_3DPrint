@@ -63,7 +63,8 @@ test('A7 真实 IPC 重复识别与取消后可继续，任务临时目录清空
   }
 });
 
-test('A7 真窗口关闭等待 v2 引擎与临时目录退出，取消关窗仍可操作', async () => {
+for (const mode of ['v2', 'legacy'] as const) {
+test(`A7 真窗口关闭等待 ${mode} 引擎与临时目录退出，取消关窗仍可操作`, async () => {
   const directory = path.join(process.cwd(), 'artifacts', `shutdown-${Date.now()}`);
   await fs.mkdir(directory, { recursive: true });
   const env: Record<string, string> = { ...inheritedEnv(), TMP: directory, TEMP: directory };
@@ -88,11 +89,18 @@ test('A7 真窗口关闭等待 v2 引擎与临时目录退出，取消关窗仍�
     }), fixture);
     expect(afterCancelledClose.result.status).toBe('success');
     const opaque = await page.evaluate(() => {
-      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 64;
-      canvas.getContext('2d')!.fillRect(0, 0, 64, 64); return canvas.toDataURL();
+      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 2048;
+      const context = canvas.getContext('2d')!;
+      context.fillRect(0, 0, 2048, 2048);
+      context.fillStyle = 'red'; context.fillRect(256, 256, 1536, 1536);
+      return canvas.toDataURL();
     });
-    const pending = page.evaluate(imageDataUrl => window.reliefV2!.import({ requestId: 'close-import',
-      payload: { imageDataUrl, sizeMm: [10, 10], keepBackground: false } }), opaque).catch(() => null);
+    const pending = page.evaluate(async ({ imageDataUrl, mode }) => {
+      if (mode === 'v2') await window.reliefV2!.import({ requestId: 'close-import',
+        payload: { imageDataUrl, sizeMm: [10, 10], keepBackground: false } });
+      else await window.relief!.segment({ image: imageDataUrl, name: '退出回归', sizeMm: [10, 10], colors: 2 });
+    },
+    { imageDataUrl: opaque, mode }).catch(() => null);
     const python = path.join(process.cwd(), '.venv/Scripts/python.exe');
     let enginePids: number[] = [];
     for (let attempt = 0; attempt < 40; attempt++) {
@@ -110,7 +118,7 @@ test('A7 真窗口关闭等待 v2 引擎与临时目录退出，取消关窗仍�
       'import psutil,json,sys; print(json.dumps([pid for pid in json.loads(sys.argv[1]) if psutil.pid_exists(pid)]))',
       JSON.stringify(enginePids)], { encoding: 'utf8' }));
     expect(alive).toEqual([]);
-    expect((await fs.readdir(directory)).filter(name => name.startsWith('relief-v2-'))).toEqual([]);
+    expect((await fs.readdir(directory)).filter(name => /^relief-(v2|job)-/.test(name))).toEqual([]);
   } finally {
     if (!closed) {
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach(window => window.destroy()));
@@ -118,3 +126,4 @@ test('A7 真窗口关闭等待 v2 引擎与临时目录退出，取消关窗仍�
     }
   }
 });
+}

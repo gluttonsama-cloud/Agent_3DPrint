@@ -14,14 +14,19 @@ let segmentChild, segmentTask;
 let segmentCanceled = false;
 const subject = require('./subject.cjs')(app, root);
 let v2Runtime, quitting = false, quitReady = false;
+const legacyTasks = new Set();
 // will-quit 在窗口确认关闭之后触发，用户选择继续编辑时不停止任务。
 app.on('will-quit', event => {
   if (quitReady) return;
   event.preventDefault();
   if (quitting) return;
   quitting = true;
-  subject.stop();
-  Promise.resolve(v2Runtime?.shutdown()).catch(error => console.error('退出任务清理失败', error))
+  if (segmentChild) segmentChild.kill();
+  Promise.allSettled([subject.shutdown(), v2Runtime?.shutdown(), ...legacyTasks]).then(results => {
+    for (const result of results) {
+      if (result.status === 'rejected') console.error('退出任务清理失败', result.reason);
+    }
+  })
     .finally(() => { quitReady = true; app.quit(); });
 });
 
@@ -55,9 +60,10 @@ async function runEngine(job, destination) {
       if (job.action === 'segment') segmentChild = child;
       let stdout = '';
       let stderr = '';
+      let processError;
       const timer = setTimeout(() => {
+        processError = new Error('算法处理超过 120 秒，请减小图片或层数后重试');
         child.kill();
-        reject(new Error('算法处理超过 120 秒，请减小图片或层数后重试'));
       }, 120000);
       child.stdout.on('data', (chunk) => {
         stdout = (stdout + chunk.toString()).slice(-1_000_000);
@@ -67,12 +73,13 @@ async function runEngine(job, destination) {
       });
       child.on('error', (error) => {
         clearTimeout(timer);
-        reject(error);
+        processError = error;
       });
       child.on('close', (code) => {
         if (segmentChild === child) segmentChild = null;
         clearTimeout(timer);
         try {
+          if (processError) throw processError;
           const response = JSON.parse(stdout.trim());
           if (code !== 0 || !response.ok) throw new Error(response.error?.message || stderr);
           resolve(response);
@@ -89,7 +96,7 @@ async function runEngine(job, destination) {
     }
     return result;
   } finally {
-    await fs.rm(temp, { recursive: true, force: true });
+    await fs.rm(temp, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 }
 
@@ -102,13 +109,19 @@ function handle(name, action, concurrent = false) {
     ) {
       throw new Error('不允许的调用来源');
     }
+    if (quitting) throw new Error('程序正在退出');
     if (concurrent) return action(value);
     if (busy) throw new Error('正在处理上一项任务');
     busy = true;
+    let finished;
+    const done = new Promise(resolve => { finished = resolve; });
+    legacyTasks.add(done);
     try {
       return await action(value);
     } finally {
       busy = false;
+      legacyTasks.delete(done);
+      finished();
     }
   });
 }

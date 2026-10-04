@@ -7,34 +7,48 @@ module.exports = function subjectRuntime(app, root) {
     pending,
     buffer = '',
     stderr = '';
+  const retiring = new Set();
+  const closed = new WeakMap();
+  let stopping = false;
+  const modern = path.join(root, 'model-runtime');
   const directory = app.isPackaged
     ? path.join(path.dirname(app.getPath('exe')), 'model-runtime')
-    : root;
+    : fs.existsSync(path.join(modern, 'sam2.1_hiera_tiny.pt')) &&
+        fs.existsSync(path.join(modern, 'birefnet-hr', 'model.safetensors'))
+      ? modern
+      : path.join(root, 'artifacts');
   const command = app.isPackaged
     ? path.join(directory, 'subject-engine.exe')
     : path.join(root, '.gpu-venv', 'Scripts', 'python.exe');
-  const checkpoint = app.isPackaged
-    ? path.join(directory, 'sam2.1_hiera_tiny.pt')
-    : path.join(root, 'artifacts', 'sam2.1_hiera_tiny.pt');
+  const checkpoint = path.join(directory, 'sam2.1_hiera_tiny.pt');
   const foreground = path.join(path.dirname(checkpoint), 'birefnet-hr', 'model.safetensors');
   function stop(message = '识别已取消') {
     const current = child;
     child = null;
-    current?.kill();
+    if (current) {
+      retiring.add(closed.get(current));
+      current.kill();
+    }
     buffer = '';
     if (pending) {
       clearTimeout(pending.timer);
       pending.reject(new Error(message));
       pending = null;
     }
+    return Promise.all([...retiring]);
   }
   return {
     stop,
+    shutdown: () => {
+      stopping = true;
+      return stop('程序正在退出');
+    },
     status: () => ({
       installed: fs.existsSync(command) && fs.existsSync(checkpoint) && fs.existsSync(foreground),
       directory,
     }),
     request(job) {
+      if (stopping || retiring.size) return Promise.reject(new Error('模型进程正在退出，请稍后重试'));
       if (!fs.existsSync(command) || !fs.existsSync(checkpoint) || !fs.existsSync(foreground))
         return Promise.reject(
           new Error('尚未安装 GPU 主体模型包，请将 model-runtime 放在程序同目录。'),
@@ -53,6 +67,11 @@ module.exports = function subjectRuntime(app, root) {
           env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
         });
         child = current;
+        const done = new Promise(resolve => current.once('close', () => {
+          retiring.delete(done);
+          resolve();
+        }));
+        closed.set(current, done);
         buffer = '';
         stderr = '';
         current.stdout.setEncoding('utf8');
@@ -81,6 +100,7 @@ module.exports = function subjectRuntime(app, root) {
           }
         });
         current.stderr.on('data', (data) => {
+          if (child !== current) return;
           stderr = (stderr + data.toString()).slice(-2000);
         });
         current.on('error', (error) => {
