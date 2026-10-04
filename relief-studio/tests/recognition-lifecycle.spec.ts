@@ -8,14 +8,28 @@ function inheritedEnv(): Record<string, string> {
     .filter((entry): entry is [string, string] => entry[1] !== undefined));
 }
 
+async function launch(env: Record<string, string>) {
+  delete env.ELECTRON_RUN_AS_NODE;
+  const packaged = env.RELIEF_TEST_PACKAGED === '1';
+  if (packaged) {
+    env.PATH = `${process.env.SystemRoot}\\System32`;
+    delete env.PYTHONHOME; delete env.PYTHONPATH;
+  }
+  const app = await electron.launch(packaged ? {
+    executablePath: path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), env,
+  } : { args: [process.cwd()], env });
+  expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(packaged);
+  if (packaged) expect(await app.evaluate(({ app }) => app.getVersion())).toBe('0.4.2-d2.3');
+  return app;
+}
+
 test('A7 真实 IPC 重复识别与取消后可继续，任务临时目录清空', async () => {
   const directory = path.join(process.cwd(), 'artifacts', `recognition-lifecycle-${Date.now()}`);
   const temporary = path.join(directory, 'tmp');
   await fs.mkdir(temporary, { recursive: true });
   const env: Record<string, string> = { ...inheritedEnv(), TMP: temporary, TEMP: temporary,
     RELIEF_BIREFNET_DIRECTORY: path.join(directory, 'missing-model') };
-  delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [process.cwd()], env });
+  const app = await launch(env);
   const samples: unknown[] = [];
   try {
     const page = await app.firstWindow();
@@ -68,8 +82,7 @@ test(`A7 真窗口关闭等待 ${mode} 引擎与临时目录退出，取消关�
   const directory = path.join(process.cwd(), 'artifacts', `shutdown-${Date.now()}`);
   await fs.mkdir(directory, { recursive: true });
   const env: Record<string, string> = { ...inheritedEnv(), TMP: directory, TEMP: directory };
-  delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [process.cwd()], env });
+  const app = await launch(env);
   let closed = false;
   try {
     const page = await app.firstWindow();
@@ -105,7 +118,7 @@ test(`A7 真窗口关闭等待 ${mode} 引擎与临时目录退出，取消关�
     let enginePids: number[] = [];
     for (let attempt = 0; attempt < 40; attempt++) {
       enginePids = JSON.parse(execFileSync(python, ['-c',
-        'import psutil,json,sys; print(json.dumps([p.pid for p in psutil.Process(int(sys.argv[1])).children(recursive=True) if "python" in p.name().lower()]))',
+        'import psutil,json,sys; print(json.dumps([p.pid for p in psutil.Process(int(sys.argv[1])).children(recursive=True) if "python" in p.name().lower() or p.name().lower() == "relief-engine.exe"]))',
         String(app.process().pid)], { encoding: 'utf8' }));
       if (enginePids.length) break;
       await new Promise(resolve => setTimeout(resolve, 50));
