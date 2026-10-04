@@ -13,7 +13,17 @@ let busy = false;
 let segmentChild, segmentTask;
 let segmentCanceled = false;
 const subject = require('./subject.cjs')(app, root);
-app.on('before-quit', () => subject.stop());
+let v2Runtime, quitting = false, quitReady = false;
+// will-quit 在窗口确认关闭之后触发，用户选择继续编辑时不停止任务。
+app.on('will-quit', event => {
+  if (quitReady) return;
+  event.preventDefault();
+  if (quitting) return;
+  quitting = true;
+  subject.stop();
+  Promise.resolve(v2Runtime?.shutdown()).catch(error => console.error('退出任务清理失败', error))
+    .finally(() => { quitReady = true; app.quit(); });
+});
 
 function engineCommand(action) {
   if (!app.isPackaged && ['recognition', 'import'].includes(action)) {
@@ -108,7 +118,7 @@ async function chooseSave(defaultPath, filters) {
 }
 
 function registerHandlers() {
-  require('./v2.cjs')({ handle, engineCommand, chooseSave,
+  v2Runtime = require('./v2.cjs')({ handle, engineCommand, chooseSave,
     chooseOpen: () => dialog.showOpenDialog(mainWindow, {
       properties: ['openFile'], filters: [{ name: '浮雕工程', extensions: ['json'] }],
     }),

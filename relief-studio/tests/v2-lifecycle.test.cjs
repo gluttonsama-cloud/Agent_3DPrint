@@ -7,7 +7,7 @@ const registerV2 = require('../electron/v2.cjs');
 
 function harness(options = {}) {
   const handlers = {};
-  registerV2({ handle: (name, fn) => { handlers[name] = fn; },
+  handlers.runtime = registerV2({ handle: (name, fn) => { handlers[name] = fn; },
     engineCommand: () => [process.execPath, [path.join(__dirname, 'fixtures/v2/task-engine.cjs')]],
     cancelGraceMs: 50, ...options });
   return handlers;
@@ -36,6 +36,44 @@ test('取消无响应的识别进程后，清理目录并释放任务槽', async
     if (progress?.pid) { try { process.kill(progress.pid); } catch {} }
     await pending;
   }
+});
+
+test('退出等待计算进程和临时目录回收，并拒绝新任务', async () => {
+  const handlers = harness();
+  const pending = handlers['v2:recognition']({ requestId: 'shutdown-hang', payload: { hang: true } });
+  let progress;
+  try {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      progress = await handlers['v2:progress']({ requestId: 'shutdown-hang' });
+      if (progress) break;
+      await delay(10);
+    }
+    assert.ok(progress?.pid);
+    const shutdown = handlers.runtime.shutdown();
+    assert.equal((await handlers['v2:height']({ requestId: 'after-shutdown', payload: {} })).result.status, 'cancelled');
+    await Promise.all([shutdown, handlers.runtime.shutdown()]);
+    assert.equal((await pending).result.status, 'cancelled');
+    assert.throws(() => process.kill(progress.pid, 0));
+    await assert.rejects(fs.stat(progress.directory), { code: 'ENOENT' });
+  } finally {
+    if (progress?.pid) { try { process.kill(progress.pid); } catch {} }
+    await pending;
+  }
+});
+
+test('退出等待已有保存结果，且启动前退出不启动引擎', async () => {
+  const handlers = harness();
+  const pending = handlers['v2:save']({ requestId: 'shutdown-save', payload: { path: 'fixture-only', delayMs: 150 } });
+  for (let attempt = 0; attempt < 200; attempt++) {
+    if (await handlers['v2:progress']({ requestId: 'shutdown-save' })) break;
+    await delay(10);
+  }
+  await handlers.runtime.shutdown();
+  assert.equal((await pending).result.status, 'success');
+  const early = harness({ engineCommand: () => { throw new Error('不应启动进程'); } });
+  const initial = early['v2:recognition']({ requestId: 'early', payload: {} });
+  await early.runtime.shutdown();
+  assert.equal((await initial).result.status, 'cancelled');
 });
 
 test('保存收到迟到取消仍如实返回成功，不套用计算任务的强制终止', async () => {

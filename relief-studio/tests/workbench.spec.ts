@@ -1,8 +1,14 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 
-test('工作台并排预览保留二维选区，顶部撤销恢复尺寸', async () => {
-  const env = { ...process.env };
+function launchEnv(): Record<string, string> {
+  const env = Object.fromEntries(Object.entries(process.env)
+    .filter((entry): entry is [string, string] => entry[1] !== undefined));
   delete env.ELECTRON_RUN_AS_NODE;
+  return env;
+}
+
+test('工作台并排预览保留二维选区，顶部撤销恢复尺寸', async () => {
+  const env = launchEnv();
   const app = await electron.launch({ args: [process.cwd()], env });
   const page = await app.firstWindow();
   const errors: string[] = [];
@@ -80,13 +86,16 @@ test('工作台并排预览保留二维选区，顶部撤销恢复尺寸', async
     await page.screenshot({ path: 'artifacts/workbench/compact-workbench.png' });
     expect(errors).toEqual([]);
   } finally {
+    // 无论断言是否成功，都绕过未保存提示，避免测试清理阻塞。
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows().forEach(window => window.destroy());
+    });
     await app.close();
   }
 });
 
 test('空格临时平移保持擦除工具，失焦与 Esc 取消未提交笔画', async () => {
-  const env = { ...process.env };
-  delete env.ELECTRON_RUN_AS_NODE;
+  const env = launchEnv();
   const app = await electron.launch({ args: [process.cwd()], env });
   const page = await app.firstWindow();
   try {

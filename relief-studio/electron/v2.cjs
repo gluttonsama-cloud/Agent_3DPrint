@@ -5,6 +5,7 @@ const path = require('node:path');
 
 module.exports = function registerV2({ handle, engineCommand, chooseSave, chooseOpen, cancelGraceMs = 10000 }) {
   const tasks = new Map();
+  let stopping = false;
   const fail = (base, message) => ({ status: 'error', base, code: 'V2_IPC_FAILED', message });
   async function run(action, request) {
     const requestId = request?.requestId;
@@ -14,8 +15,11 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
       : { sessionId: requestId, revision: 0 };
     if (typeof requestId !== 'string' || !/^[\w-]{1,100}$/.test(requestId) || !payload)
       return { requestId, result: fail(base, '请求编号或内容无效') };
+    if (stopping) return { requestId, result: { status: 'cancelled', base } };
     if (tasks.size) return { requestId, result: fail(base, '已有 v2 任务正在执行') };
-    const task = { cancelled: false, directory: null, action, stop: null };
+    let finish;
+    const done = new Promise(resolve => { finish = resolve; });
+    const task = { cancelled: false, directory: null, action, stop: null, done };
     tasks.set(requestId, task);
     try {
       task.directory = await fs.mkdtemp(path.join(os.tmpdir(), 'relief-v2-'));
@@ -75,12 +79,13 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
       } finally {
         // 清理失败仍须释放任务槽，不能让下一次操作永久误报忙碌。
         tasks.delete(requestId);
+        finish();
       }
     }
   }
   for (const action of ['height', 'recognition', 'export', 'save', 'open', 'migrate', 'import'])
     handle(`v2:${action}`, request => run(action, request), true);
-  handle('v2:cancel', async ({ requestId }) => {
+  async function cancelTask({ requestId }) {
     const task = tasks.get(requestId);
     if (!task) return;
     task.cancelled = true;
@@ -90,11 +95,20 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
       try { await fs.writeFile(path.join(task.directory, 'cancel'), 'cancel'); }
       catch (error) { if (error.code !== 'ENOENT') throw error; }
     }
-  }, true);
+  }
+  handle('v2:cancel', cancelTask, true);
   handle('v2:progress', async ({ requestId }) => {
     const task = tasks.get(requestId);
     if (!task?.directory) return null;
     try { return JSON.parse(await fs.readFile(path.join(task.directory, 'progress.json'), 'utf8')); }
     catch { return null; }
   }, true);
+  return {
+    async shutdown() {
+      stopping = true;
+      const pending = [...tasks.entries()];
+      await Promise.allSettled(pending.map(([requestId]) => cancelTask({ requestId })));
+      await Promise.all(pending.map(([, task]) => task.done));
+    },
+  };
 };
