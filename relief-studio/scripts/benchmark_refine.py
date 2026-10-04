@@ -1,5 +1,6 @@
 """人工确定区域对照；未标注边缘不计为正确或错误。"""
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -16,12 +17,28 @@ from subject_worker import SubjectWorker
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--out', type=Path, required=True)
+  parser.add_argument('--project', type=Path, default=ROOT/'artifacts/foreground-040/sample.relief.json')
+  parser.add_argument('--checkpoint', type=Path, default=ROOT/'model-runtime/sam2.1_hiera_tiny.pt')
   args = parser.parse_args()
   args.out.mkdir(parents=True, exist_ok=False)
   reference = json.loads((ROOT/'samples/refine-reference.json').read_text('utf-8'))
-  project = json.loads((ROOT/'artifacts/foreground-040/sample.relief.json').read_text('utf-8'))
+  project = json.loads(args.project.read_text('utf-8'))
   source = decode_image(project['image'])
-  worker = SubjectWorker(str(ROOT/'artifacts/sam2.1_hiera_tiny.pt'))
+  if list(source.shape[1::-1]) != reference['size']:
+    raise ValueError('源图尺寸与局部标注不一致')
+  if hashlib.sha256(source.tobytes()).hexdigest() != reference['sourceRgbaSha256']:
+    raise ValueError('源图内容与局部标注不一致')
+  with args.checkpoint.open('rb') as checkpoint_file:
+    checkpoint_hash = hashlib.file_digest(checkpoint_file, 'sha256').hexdigest()
+  worker = SubjectWorker(str(args.checkpoint))
+  (args.out/'provenance.json').write_text(json.dumps({
+    'project': str(args.project.resolve()),
+    'projectSha256': hashlib.sha256(args.project.read_bytes()).hexdigest(),
+    'referenceSha256': hashlib.sha256((ROOT/'samples/refine-reference.json').read_bytes()).hexdigest(),
+    'sourceRgbaSha256': hashlib.sha256(source.tobytes()).hexdigest(),
+    'checkpoint': str(args.checkpoint.resolve()), 'checkpointSha256': checkpoint_hash,
+    'scope': 'existing partial interior annotations; not full contour ground truth',
+  }, indent=2), 'utf-8')
   rows = []
   for case in reference['cases']:
     annotation = Image.new('L', tuple(reference['size']), 128)

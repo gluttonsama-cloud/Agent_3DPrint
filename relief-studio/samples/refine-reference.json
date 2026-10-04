@@ -1,5 +1,6 @@
 {
   "sourceName": "微信图片_20260821172229_5_113.jpg",
+  "sourceRgbaSha256": "ab1a8f422fe43e09493c926f071c4aa4dbe6ef17c56f178a7feed364427eb16a",
   "size": [1280, 1280],
   "annotationMethod": "主代理查看原图及放大图后手工标注；仅标注确定内部，未标注像素为待确认。不是完整轮廓真值。",
   "cases": [
