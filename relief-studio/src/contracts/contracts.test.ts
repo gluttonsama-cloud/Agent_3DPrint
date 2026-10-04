@@ -7,6 +7,20 @@ import corruptText from '../../tests/fixtures/v2/corrupt-base64-v2.json?raw';
 import type { EditPatch } from './index';
 
 describe('v2 协议边界', () => {
+  it('2048 蒙版与 RGBA 栅格解码不会耗尽正则调用栈', () => {
+    for (const channels of [1, 4]) {
+      const source = new Uint8Array(2048 * 2048 * channels).fill(173);
+      source[source.length - 1] = 0;
+      const restored = decodeRaster(encodeRaster(source), source.length);
+      expect(restored.length).toBe(source.length);
+      expect(restored.every((value, i) => value === source[i])).toBe(true);
+    }
+  });
+  it('拒绝空白、错位填充和非规范尾位，允许合法的空栅格', () => {
+    for (const data of [' A==', 'A===', 'AA=A', 'AB==', 'AA?='])
+      expect(() => decodeRaster({ type: 'uint8', encoding: 'base64-le', data }, 1)).toThrow();
+    expect(decodeRaster(encodeRaster(new Uint8Array()), 0).length).toBe(0);
+  });
   it('拒绝运行时原图改写和属性越权注入', () => {
     const snapshot = makeFixture();
     for (const payload of [

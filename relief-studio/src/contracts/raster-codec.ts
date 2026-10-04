@@ -30,10 +30,10 @@ export function decodeRaster(value: unknown, count: number): Uint8Array | Uint16
     throw new Error('invalid raster encoding');
   }
   const byteCount = count * (raster.type === 'uint16' ? 2 : 1);
-  if (raster.data.length !== Math.ceil(byteCount / 3) * 4 ||
-      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(raster.data)) {
+  if (raster.data.length !== Math.ceil(byteCount / 3) * 4) {
     throw new Error('invalid base64 or raster length');
   }
+  // 原生解码后回编码核对规范形式，避免大栅格触发重复分组正则的栈溢出。
   const binary = atob(raster.data);
   if (binary.length !== byteCount || btoa(binary) !== raster.data) {
     throw new Error('noncanonical base64 or raster length');
