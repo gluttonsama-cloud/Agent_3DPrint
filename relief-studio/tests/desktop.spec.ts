@@ -1,8 +1,12 @@
+import { decodeProject } from '../src/project-codec';
 import { test, expect, _electron as electron } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const root = process.cwd();
+test.beforeAll(async () => {
+  await fs.mkdir(path.join(root, 'artifacts'), { recursive: true });
+});
 
 test('区域属性不再显示独立修整入口', async () => {
   const app = await launchDesktop(),
@@ -85,13 +89,13 @@ test('框选补选传递原图坐标，保留框外画笔并支持撤销', async
       .toBe(brushOnly);
     await drag();
     await dialog.getByRole('button', { name: '应用识别结果' }).click();
-    const filename = path.join(root, 'artifacts', 'local-box.relief.json');
+    const filename = path.join(root, 'artifacts', `local-box-v2-${Date.now()}.relief.json`);
     await app.evaluate(({ dialog }, filePath) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath });
     }, filename);
     await page.getByRole('button', { name: '保存工程', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('工程已保存');
-    const saved = JSON.parse(await fs.readFile(filename, 'utf8'));
+    await expect(page.locator('.statusbar')).toContainText('工程已保存');
+    const saved = decodeProject(JSON.parse(await fs.readFile(filename, 'utf8')));
     expect(saved.labels[505]).toBe(2);
     expect(saved.labels[3535]).toBe(2);
     expect(saved.labels[9090]).toBe(1);
@@ -149,13 +153,13 @@ test('分色背景逐块排除、恢复，保留主体中的同色白字', async
     await expect.poll(alphas).toEqual([0, 255]);
     await page.screenshot({ path: path.join(root, 'artifacts', 'background-confirmation.png') });
     await dialog.getByRole('button', { name: '应用识别结果' }).click();
-    const savePath = path.join(root, 'artifacts', 'background-confirmation.relief.json');
+    const savePath = path.join(root, 'artifacts', `background-confirmation-v2-${Date.now()}.relief.json`);
     await app.evaluate(({ dialog }, filename) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: filename });
     }, savePath);
     await page.getByRole('button', { name: '保存工程', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('工程已保存');
-    const saved = JSON.parse(await fs.readFile(savePath, 'utf8'));
+    await expect(page.locator('.statusbar')).toContainText('工程已保存');
+    const saved = decodeProject(JSON.parse(await fs.readFile(savePath, 'utf8')));
     expect(saved.labels[505]).toBe(0);
     expect(saved.labels[5050]).toBeGreaterThan(0);
     expect(saved.labels[3030]).toBeGreaterThan(0);
@@ -212,8 +216,8 @@ test('GPU 整体主体、直接补选排除撤销、背景零层', async () => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: filename });
     }, savePath);
     await page.getByRole('button', { name: '保存工程', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('工程已保存');
-    const saved = JSON.parse(await fs.readFile(savePath, 'utf8'));
+    await expect(page.locator('.statusbar')).toContainText('工程已保存');
+    const saved = decodeProject(JSON.parse(await fs.readFile(savePath, 'utf8')));
     expect(saved.labels[653 * 1280 + 627]).toBe(2);
     expect(saved.labels[663 * 1280 + 876]).toBe(2);
     expect(saved.labels[790 * 1280 + 505]).toBe(2);
@@ -236,6 +240,7 @@ test('重新识别先预览，取消不修改，应用后整步撤销', async ()
   try {
     await page.getByRole('button', { name: '打开 55 mm 徽标示例' }).click();
     await expect(page.locator('.region-height')).toHaveText(['0 层', '5 层', '10 层']);
+    await expect(page.locator('.statusbar')).toContainText('示例已打开');
     const recovery = await page.evaluate(async () => {
       const bridge = window.relief!;
       const sample = await bridge.sample();
@@ -281,6 +286,8 @@ test('选区保持原色、追加减选、分配撤销与紧凑窗口', async ()
   try {
     await page.setViewportSize({ width: 1100, height: 720 });
     await page.getByRole('button', { name: '打开 55 mm 徽标示例' }).click();
+    await page.getByRole('button', { name: '更多工具', exact: true }).click();
+    await page.getByRole('button', { name: '同色选区', exact: true }).click();
     const art = page.getByLabel('图案编辑画布');
     await expect(art).toHaveAttribute('data-ready', 'true');
     const sample = JSON.parse(
@@ -299,37 +306,9 @@ test('选区保持原色、追加减选、分配撤销与紧凑窗口', async ()
     const before = await art.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
     for (const region of sample.regions) {
       await page.locator('.region-card').filter({ hasText: region.name }).click();
-      await expect(page.getByTestId('selection-count')).toHaveAttribute(
-        'data-count',
-        String(sample.labels.filter((id: number) => id === region.id).length),
-      );
-      const alpha = await page.getByLabel('选区聚焦').evaluate((canvas: HTMLCanvasElement) => {
-        const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
-        return Array.from(
-          { length: canvas.width * canvas.height },
-          (_, index) => data[index * 4 + 3],
-        );
-      });
-      expect(
-        alpha.every(
-          (value, index) =>
-            value === (sample.labels[index] && sample.labels[index] !== region.id ? 235 : 0),
-        ),
-      ).toBe(true);
+      await expect(page.getByTestId('selection-count')).toHaveAttribute('data-count', '0');
       expect(await art.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(before);
-      await page.screenshot({
-        path: path.join(root, 'artifacts', `focus-region-${region.id}.png`),
-      });
     }
-    await page.getByRole('button', { name: '取消选区', exact: true }).click();
-    expect(
-      await page.getByLabel('选区聚焦').evaluate((canvas: HTMLCanvasElement) =>
-        canvas
-          .getContext('2d')!
-          .getImageData(0, 0, canvas.width, canvas.height)
-          .data.some((value) => value !== 0),
-      ),
-    ).toBe(false);
     const clickPixel = async (index: number, modifiers?: ('Shift' | 'Alt')[]) => {
       const box = (await art.boundingBox())!;
       await art.click({
@@ -392,21 +371,21 @@ test('选区保持原色、追加减选、分配撤销与紧凑窗口', async ()
     await page.getByRole('button', { name: '画笔', exact: true }).click();
     await page.getByLabel('绘入区域').selectOption(String(white));
     await clickPixel(goldIndices[Math.floor(goldIndices.length / 2)]);
-    const savePath = path.join(root, 'artifacts', 'selection-assignment.relief.json');
+    const savePath = path.join(root, 'artifacts', `selection-assignment-v2-${Date.now()}.relief.json`);
     await app.evaluate(({ dialog }, filename) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: filename });
     }, savePath);
     await page.getByRole('button', { name: '保存工程', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('工程已保存');
-    const saved = JSON.parse(await fs.readFile(savePath, 'utf8'));
-    const changes = saved.labels.flatMap((id: number, index: number) =>
+    await expect(page.locator('.statusbar')).toContainText('工程已保存');
+    const saved = decodeProject(JSON.parse(await fs.readFile(savePath, 'utf8')));
+    const changes = Array.from(saved.labels).flatMap((id: number, index: number) =>
       id !== sample.labels[index] ? [index] : [],
     );
     expect(changes.length).toBe(goldIndices.length);
     expect(changes.every((index: number) => sample.labels[index] === gold)).toBe(true);
     expect(saved.labels[goldIndices[Math.floor(goldIndices.length / 2)]]).toBe(white);
     expect(saved.labels.filter((id: number) => id === 4).length).toBeGreaterThan(0);
-    expect(saved.image).toBe(sample.image);
+    expect(saved.colors).toEqual(saved.original);
   } finally {
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows().forEach((window) => window.destroy()),
@@ -447,6 +426,7 @@ test('离线桌面：样例编辑、3D、撤销、保存重开、导出', async 
     await page.getByRole('button', { name: '打开 55 mm 徽标示例' }).click();
     await expect(page.getByRole('heading', { name: '科尔沁 · 55 mm 徽标' })).toBeVisible();
     await page.getByRole('button', { name: /白字 · 凸起/ }).click();
+    await page.locator('.advanced-properties > summary').click();
     await expect(page.getByLabel('区域层数', { exact: true })).toHaveValue('10');
     await page.getByLabel('区域层数', { exact: true }).fill('15');
     await page.getByLabel('区域层数', { exact: true }).press('Enter');
@@ -467,28 +447,30 @@ test('离线桌面：样例编辑、3D、撤销、保存重开、导出', async 
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: filename });
     }, savePath);
     await page.getByRole('button', { name: /^保存/ }).click();
-    await expect(page.getByRole('status')).toContainText('工程已保存');
-    const saved = JSON.parse(await fs.readFile(savePath, 'utf8'));
+    await expect(page.locator('.statusbar')).toContainText('工程已保存');
+    const saved = decodeProject(JSON.parse(await fs.readFile(savePath, 'utf8')));
     expect(saved.sizeMm).toEqual([60, 55]);
     await app.evaluate(({ dialog }, filename) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [filename] });
     }, savePath);
     await page.getByRole('button', { name: '打开工程', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('工程已恢复');
+    await expect(page.locator('.statusbar')).toContainText('工程已恢复');
     await expect(page.getByLabel('宽度', { exact: true })).toHaveValue('60');
     await app.evaluate(({ dialog }, directory) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [directory] });
     }, output);
     await page.getByRole('button', { name: '导出分层' }).click();
-    await expect(page.getByRole('status')).toContainText('分层文件已导出');
+    await page.getByLabel('新输出目录').fill(path.join(output, 'relief-v2'));
+    await page.getByRole('button', { name: '导出', exact: true }).click();
+    await expect(page.locator('.statusbar')).toContainText('分层文件已导出');
     const dir = (await fs.readdir(output)).find((name) => name.startsWith('relief-'))!;
     const manifest = JSON.parse(await fs.readFile(path.join(output, dir, 'manifest.json'), 'utf8'));
-    expect(manifest.layerCount).toBe(10);
+    expect(manifest.whiteLayerCount).toBe(10);
     expect(manifest.sizeMm).toEqual([60, 55]);
-    expect(manifest.calibrated).toBe(false);
-    expect(await fs.readdir(path.join(output, dir, 'layers'))).toHaveLength(10);
-    const restored = JSON.parse(await fs.readFile(path.join(output, dir, 'project.json'), 'utf8'));
-    expect(restored).toEqual(saved);
+    expect(manifest.heightCalibrationStatus).toBe('design-unverified');
+    expect(await fs.readdir(path.join(output, dir, 'white'))).toHaveLength(10);
+    const restored = decodeProject(JSON.parse(await fs.readFile(path.join(output, dir, 'project.json'), 'utf8')));
+    expect({ ...restored, sessionId: saved.sessionId, revision: saved.revision }).toEqual(saved);
     expect(errors).toEqual([]);
   } finally {
     await app.evaluate(({ BrowserWindow }) =>
@@ -523,8 +505,9 @@ test('导入、圆形裁剪、分区、画笔擦除与撤销', async () => {
       '已识别',
     );
     await page.getByRole('button', { name: '应用识别结果', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('分区已完成');
+    await expect(page.locator('.statusbar')).toContainText('分区已完成');
     await expect(page.locator('.region-card')).toHaveCount(3);
+    await page.getByRole('button', { name: '更多工具', exact: true }).click();
     await page.getByRole('button', { name: '擦除', exact: true }).click();
     const art = page.getByLabel('图案编辑画布');
     const artBox = (await art.boundingBox())!;

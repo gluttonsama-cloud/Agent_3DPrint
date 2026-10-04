@@ -88,7 +88,7 @@ function handle(name, action, concurrent = false) {
     if (
       event.sender !== mainWindow.webContents ||
       event.senderFrame !== mainWindow.webContents.mainFrame ||
-      event.senderFrame.url !== pathToFileURL(indexPath).href
+      event.senderFrame.url !== pathToFileURL(indexPath).href + (process.argv.includes('--d1') ? '?d1=1' : '')
     ) {
       throw new Error('不允许的调用来源');
     }
@@ -112,6 +112,24 @@ function registerHandlers() {
     chooseOpen: () => dialog.showOpenDialog(mainWindow, {
       properties: ['openFile'], filters: [{ name: '浮雕工程', extensions: ['json'] }],
     }),
+  });
+  handle('relief:export-stl', async (input) => {
+    const result = await chooseSave('浮雕模型.stl', [{ name: 'STL 模型', extensions: ['stl'] }]);
+    if (result.canceled || !result.filePath) return null;
+    const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'relief-stl-'));
+    const output = path.join(temporary, 'output');
+    const target = result.filePath;
+    const staged = `${target}.tmp-${Date.now()}`;
+    try {
+      await runEngine({ action: 'stl', project: input?.project, options: input?.options }, output);
+      const info = JSON.parse(await fs.readFile(path.join(output, 'mesh-info.json'), 'utf8'));
+      await fs.copyFile(path.join(output, 'model.stl'), staged);
+      await fs.rename(staged, target);
+      return { path: target, repairedPixels: info.repairedPixels };
+    } finally {
+      await fs.rm(staged, { force: true });
+      await fs.rm(temporary, { recursive: true, force: true });
+    }
   });
   handle(
     'relief:segment-cancel',
@@ -225,6 +243,6 @@ app.whenReady().then(() => {
     if (choice === 1) event.preventDefault();
   });
   registerHandlers();
-  mainWindow.loadFile(indexPath);
+  mainWindow.loadFile(indexPath, process.argv.includes('--d1') ? { query: { d1: '1' } } : undefined);
 });
 app.on('window-all-closed', () => app.quit());

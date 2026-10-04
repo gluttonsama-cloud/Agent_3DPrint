@@ -1,3 +1,4 @@
+import { decodeProject } from '../src/project-codec';
 import { test, expect, _electron as electron } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -5,7 +6,23 @@ import path from 'node:path';
 test('主体提取自动分色，原图对照后可选色，修改高度与保存重开保持轮廓', async () => {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [process.cwd()], env });
+  const packaged = env.RELIEF_TEST_PACKAGED === '1';
+  if (packaged) {
+    env.PATH = `${process.env.SystemRoot}\\System32`;
+    delete env.PYTHONHOME;
+    delete env.PYTHONPATH;
+  }
+  const app = await electron.launch(
+    packaged
+      ? {
+          executablePath:
+            env.RELIEF_TEST_EXECUTABLE ||
+            path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'),
+          args: [],
+          env,
+        }
+      : { args: [process.cwd()], env },
+  );
   const page = await app.firstWindow();
   try {
     const fixture = await page.evaluate(() => {
@@ -60,14 +77,14 @@ test('主体提取自动分色，原图对照后可选色，修改高度与保�
     await dialog.getByLabel('主体堆叠层数', { exact: true }).fill('6');
     await dialog.getByRole('button', { name: '应用识别结果', exact: true }).click();
     await expect(page.locator('.region-card')).toHaveCount(4);
-    const filename = path.join(process.cwd(), 'artifacts/subject-colors.relief.json');
+    const filename = path.join(process.cwd(), `artifacts/subject-colors-v2-${Date.now()}.relief.json`);
     await app.evaluate(({ dialog }, filePath) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath });
     }, filename);
     await page.getByRole('button', { name: '保存工程', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('工程已保存');
-    const saved = JSON.parse(await fs.readFile(filename, 'utf8'));
-    expect(saved.regions.map((r: { layers: number }) => r.layers)).toEqual([0, 6, 6, 6]);
+    await expect(page.locator('.statusbar')).toContainText('工程已保存');
+    const saved = decodeProject(JSON.parse(await fs.readFile(filename, 'utf8')));
+    expect(saved.regions.map(r => r.defaultLayers)).toEqual([0, 6, 6, 6]);
     expect(saved.labels[0]).toBe(1);
     expect(new Set([saved.labels[2020], saved.labels[2040], saved.labels[2060]]).size).toBe(3);
     expect(saved.labels[2060]).toBe(saved.labels[2080]);
@@ -76,7 +93,7 @@ test('主体提取自动分色，原图对照后可选色，修改高度与保�
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] });
     }, filename);
     await page.getByRole('button', { name: '打开工程', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('工程已恢复');
+    await expect(page.locator('.statusbar')).toContainText('工程已恢复');
     await expect(page.locator('.region-card')).toHaveCount(4);
     await expect
       .poll(() =>

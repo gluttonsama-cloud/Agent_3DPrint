@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld(
     save: (project) => ipcRenderer.invoke('relief:save', project),
     open: () => ipcRenderer.invoke('relief:open'),
     export: (project) => ipcRenderer.invoke('relief:export', project),
+    exportStl: (input) => ipcRenderer.invoke('relief:export-stl', input),
     sample: () => ipcRenderer.invoke('relief:sample'),
     appInfo: () => ipcRenderer.invoke('relief:info'),
   }),

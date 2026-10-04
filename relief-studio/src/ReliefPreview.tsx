@@ -81,7 +81,7 @@ export function ReliefPreview({
         const source = y * w + x;
         visible[y * w + x] = project.labels[source] ? 1 : 0;
         z[y * w + x] = project.version === 2
-          ? data.millimeters[source] * physicalScale : 0.25 + heights[source] * 0.22;
+          ? data.millimeters[source] * physicalScale : heights[source] * 0.22;
       }
     const positions: number[] = [],
       uvs: number[] = [];
@@ -284,7 +284,7 @@ export function ReliefPreview({
   return (
     <div className="preview-wrap">
       <div className="preview-host" ref={container} />
-      <span className="preview-hint">{error || '拖动旋转 · 滚轮缩放'}</span>
+      <span className="preview-hint">{error || '拖动旋转 · 滚轮缩放 · 零层无厚度，高度为示意'}</span>
     </div>
   );
 }

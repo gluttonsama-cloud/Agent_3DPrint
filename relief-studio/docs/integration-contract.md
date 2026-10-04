@@ -1,8 +1,9 @@
-# Relief Studio v2 对接契约（A1 候选）
+# Relief Studio v2 对接契约（D1 本机集成版）
 
 2026-09-29；A 分支 `cys/relief-plan-a`；共同起点 `d55ae5df0d892a1fe392adb9b7d1ce045d8eaf1a`。
-状态：类型、栅格编解码、参考应用器、模拟接口和独立真实能力可运行；等待 B 的 D1 对接，尚未冻结。
-当前正式工作台仍使用 v1；v2 算法、持久化、IPC 和面板已在独立能力入口接通，尚未整合 B 的编辑状态。
+2026-10-04：A `3073d62` 与 B `8563293` 已在 `cys/relief-d1-integration` 整合。
+工作台已使用唯一 v2 状态及历史入口，当前字段作为 D1 集成基线；后续更改须提供迁移说明。
+本机 D1 验收与剩余边界见 [D1 联调记录](2026-10-04-D1联调记录.md)，B 另一台机器接收验证仍待进行。
 
 2026-10-02 更新：见 [独立能力交付记录](2026-10-02-A计划独立能力交付.md)。
 新增可选 RecognitionRequest.prompt、ExportRequest.settings、EditPatch.diagnostics；原字段保持兼容。
@@ -110,14 +111,15 @@ mock 高度只支持 set/uniform，其余操作返回 INVALID_REQUEST；均高�
 这些 mock 不代表模型效果、真实 RIP 支持或设备验证。
 
 运行 `npm test -- src/contracts/contracts.test.ts`，包含独立应用/撤销示例。
-D1 尚需 B 在自己的状态和历史入口完成“一笔提交→候选应用→撤销→旧结果丢弃”，
-记录其分支和测试结果。此关通过后再冻结版本并完成 B 工作台接入。
+当前工作台使用 `src/editor/store.ts` 完成候选原子提交、撤销及旧结果丢弃；
+`tests/d1.spec.ts` 是实际 App 的模拟/真实能力验收，`store.test.ts` 覆盖所有版本变化及预算。
 
 ## 真实服务调用与增量字段
 
 将示例中的 mock 创建替换为 `createCapabilityService(window.reliefV2)`，从
 `src/capability-service.ts` 导入；候选仍必须经过 B 的唯一历史入口。
-完整组件组合参考 `src/CapabilityDemo.tsx`；开发验证入口为构建后 `electron . --capabilities-demo`。
+真实工作台组合见 `src/App.tsx`；独立组件示例仍保留 `src/CapabilityDemo.tsx`。
+开发验证入口为构建后 `electron . --capabilities-demo`，工作台 D1 模拟为 `electron . --d1`。
 HeightPanel、ExportPanel、ReliefPreview 不持有 B 的历史和选区。
 
 `RecognitionRequest.prompt` 为 SAM 提示：points 的 x/y 是工作像素坐标，label 为 0/1；
