@@ -3,7 +3,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 
-module.exports = function registerV2({ handle, engineCommand, chooseSave, chooseOpen }) {
+module.exports = function registerV2({ handle, engineCommand, chooseSave, chooseOpen, cancelGraceMs = 10000 }) {
   const tasks = new Map();
   const fail = (base, message) => ({ status: 'error', base, code: 'V2_IPC_FAILED', message });
   async function run(action, request) {
@@ -15,7 +15,7 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
     if (typeof requestId !== 'string' || !/^[\w-]{1,100}$/.test(requestId) || !payload)
       return { requestId, result: fail(base, '请求编号或内容无效') };
     if (tasks.size) return { requestId, result: fail(base, '已有 v2 任务正在执行') };
-    const task = { cancelled: false, directory: null };
+    const task = { cancelled: false, directory: null, action, stop: null };
     tasks.set(requestId, task);
     try {
       task.directory = await fs.mkdtemp(path.join(os.tmpdir(), 'relief-v2-'));
@@ -47,14 +47,20 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
         let stderr = '';
         // 先合作取消，使输出模块有机会清理；超时才结束进程。
         let killTimer;
+        task.stop = () => {
+          if (!killTimer) killTimer = setTimeout(() => child.kill(), cancelGraceMs);
+        };
         const timer = setTimeout(() => {
           task.cancelled = true;
           fs.writeFile(cancelPath, 'timeout').catch(() => {});
-          killTimer = setTimeout(() => child.kill(), 10000);
+          task.stop?.();
         }, 600000);
         child.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-4000); });
-        child.on('error', error => { clearTimeout(timer); clearTimeout(killTimer); reject(error); });
+        child.on('error', error => {
+          task.stop = null; clearTimeout(timer); clearTimeout(killTimer); reject(error);
+        });
         child.on('close', code => {
+          task.stop = null;
           clearTimeout(timer); clearTimeout(killTimer);
           if (code === 0) resolve(); else reject(new Error(stderr || `引擎退出 ${code}`));
         });
@@ -64,8 +70,12 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
     } catch (error) {
       return { requestId, result: task.cancelled ? { status: 'cancelled', base } : fail(base, error.message) };
     } finally {
-      if (task.directory) await fs.rm(task.directory, { recursive: true, force: true });
-      tasks.delete(requestId);
+      try {
+        if (task.directory) await fs.rm(task.directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      } finally {
+        // 清理失败仍须释放任务槽，不能让下一次操作永久误报忙碌。
+        tasks.delete(requestId);
+      }
     }
   }
   for (const action of ['height', 'recognition', 'export', 'save', 'open', 'migrate', 'import'])
@@ -74,7 +84,12 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
     const task = tasks.get(requestId);
     if (!task) return;
     task.cancelled = true;
-    if (task.directory) await fs.writeFile(path.join(task.directory, 'cancel'), 'cancel');
+    // 纯计算候选可在宽限期后终止；保存/导出继续合作取消，保留原子提交结果。
+    if (['height', 'recognition', 'import'].includes(task.action)) task.stop?.();
+    if (task.directory) {
+      try { await fs.writeFile(path.join(task.directory, 'cancel'), 'cancel'); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
   }, true);
   handle('v2:progress', async ({ requestId }) => {
     const task = tasks.get(requestId);
