@@ -10,6 +10,23 @@ from relief import segment
 
 
 class ColorEdgeTests(unittest.TestCase):
+  def test_similar_greens_preserve_unrelated_thin_details(self):
+    for color, detail in [([249, 249, 248], [229, 229, 228]),
+                          ([8, 5, 4], [28, 25, 24]),
+                          ([241, 199, 145], [221, 179, 125])]:
+      with self.subTest(color=color):
+        palette = np.array([[25, 109, 61], [84, 143, 52], color], np.uint8)
+        labels = np.ones((20, 30), np.uint16)
+        labels[:, 15:] = 2
+        labels[3:12, 5] = 3  # 无 3×3 内核的一像素细线。
+        labels[15, 7] = 3  # 孤立标点同样需要保护。
+        rgb = palette[labels-1].copy()
+        rgb[labels == 3] = detail  # 偏离中心超过 6，但仍在 32 容差内。
+        labels[0, :] = 0
+        before = labels.copy()
+        np.testing.assert_array_equal(refine_color_edges(rgb, labels, palette), before)
+        np.testing.assert_array_equal(labels, before)
+
   def test_green_yellow_transition_is_not_a_separate_light_green_spike(self):
     palette = np.array([[25, 109, 61], [84, 143, 52], [250, 209, 44]], np.uint8)
     labels = np.ones((30, 40), np.uint16)
