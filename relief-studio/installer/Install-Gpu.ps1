@@ -47,6 +47,8 @@ try {
     if ($process.ExitCode -ne 0) { throw '自动驱动安装失败；软件可继续手工编辑。请安装 NVIDIA 官方驱动后重试。' }
   }
   if (!$NonInteractive -and !$driverApproved -and !(Ask '是否启用 AI 主体识别？安装程序会自动下载并校验模型与运行时，下载量约 2.61 GB。选择“否”可稍后再运行安装程序添加。')) { exit 0 }
+  # 安装进程可能继承其他 PowerShell 的模块路径，固定加载当前宿主的系统校验模块。
+  Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1') -Force
   $manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'gpu-manifest.json') -Raw | ConvertFrom-Json
   $destination = Get-ReliefChildPath $RuntimeRoot 'model-runtime'
   if (Test-ReliefRuntime $destination $manifest) {
