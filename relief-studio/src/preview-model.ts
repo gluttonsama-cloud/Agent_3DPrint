@@ -1,4 +1,6 @@
 import { heightValues } from './model';
+import type { ProjectSnapshot } from './contracts';
+import { validateSnapshot } from './project-codec';
 
 interface GeometryInput {
   width: number;
@@ -7,9 +9,13 @@ interface GeometryInput {
   regions: { id: number; layers: number }[];
 }
 
-export function previewData(project: GeometryInput, comparison?: GeometryInput, target?: number) {
+export function previewData(project: GeometryInput | ProjectSnapshot,
+  comparison?: GeometryInput | ProjectSnapshot, target?: number) {
   const { width, height, labels } = project;
-  const heights = heightValues(labels, project.regions);
+  if ('version' in project && project.version === 2) validateSnapshot(project);
+  const heights = 'heights' in project ? project.heights : heightValues(project.labels, project.regions);
+  const millimeters = Float32Array.from(heights, value => 'heightMapping' in project &&
+    project.heightMapping.kind === 'calibrated' ? project.heightMapping.mmByLayer[value] : value * 0.1);
   let faces = 0;
   if (comparison && (comparison.width !== width || comparison.height !== height))
     throw new Error('对比工程尺寸不一致');
@@ -41,5 +47,5 @@ export function previewData(project: GeometryInput, comparison?: GeometryInput, 
       if (faces > 300000)
         throw new Error('图案边界过于复杂，已暂停 3D 预览；二维逐层和导出保留全部细节。');
     }
-  return { width, height, heights };
+  return { width, height, heights, millimeters };
 }

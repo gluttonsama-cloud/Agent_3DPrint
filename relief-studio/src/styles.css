@@ -990,3 +990,72 @@ kbd {
     transition: none !important;
   }
 }
+
+.trim-panel p,
+.trim-panel small {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #596658;
+}
+.trim-panel small {
+  display: block;
+  margin: 8px 0;
+}
+.simple-steps {
+  padding-left: 20px;
+  color: #626c5d;
+  line-height: 2;
+  margin: 12px 0 18px;
+}
+.trim-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.trim-actions button {
+  min-height: 44px;
+  font-size: 15px;
+}
+.current-layer-name {
+  padding: 9px 12px;
+  background: #edf1e9;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.advanced-properties > summary {
+  cursor: pointer;
+  padding: 18px;
+  color: #737e69;
+  font-size: 12px;
+}
+.more-tools {
+  margin-left: auto;
+}
+.tool-lasso .art-canvas,
+.tool-rectangle .art-canvas,
+.tool-smart .art-canvas {
+  cursor: crosshair;
+}
+.edit-tools,
+.tool-options {
+  flex-wrap: wrap;
+}
+.stl-dialog {
+  width: 450px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.stl-dialog p,
+.stl-dialog small {
+  line-height: 1.6;
+}
+.stl-dialog .base-toggle {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.stl-dialog .stl-error {
+  color: #a63e28;
+  overflow-wrap: anywhere;
+}

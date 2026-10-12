@@ -1,6 +1,6 @@
 {
   "name": "relief-studio",
-  "version": "0.4.0",
+  "version": "0.4.2-d2.4",
   "private": true,
   "engines": {
     "node": ">=22.12.0"
@@ -13,10 +13,13 @@
     "desktop": "npm run build && electron .",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
+    "test:ipc": "node --test tests/v2-lifecycle.test.cjs tests/subject-lifecycle.test.cjs tests/engine-command.test.cjs",
     "test:engine": "node scripts/python.cjs -m unittest discover -s engine/tests -v",
     "build:engine": "node scripts/python.cjs -m PyInstaller --noconfirm --clean --onedir --name relief-engine --distpath engine-dist --workpath build/engine engine/main.py",
     "pack": "npm run build && npm run build:engine && node scripts/collect_licenses.cjs && electron-builder --win dir",
     "dist:win": "npm run build && npm run build:engine && node scripts/collect_licenses.cjs && electron-builder --win nsis",
+    "build:gpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build_subject.ps1",
+    "dist:gpu": "electron-builder --win nsis --config installer/electron-builder.gpu.cjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

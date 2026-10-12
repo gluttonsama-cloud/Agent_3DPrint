@@ -161,6 +161,7 @@ DocumentRevisions-V100/
 .ruff_cache/
 nul
 .agents/
+.agent/
 .opencode/
 openspec/
 skills-lock.json
@@ -195,3 +196,13 @@ PLAYWRIGHT_TEST_REPORT.md
 
 # API 测试（包含密钥）
 api_test/
+
+# 历史部署打包与临时图片，不作为源码提交
+*.tar.gz
+ai-3d-head-modeler/screenshot-*.png
+ai-3d-head-modeler/test-*.png
+local-gpu-service/output.png
+backend/test-agent-scenarios.js
+backend/test-decision-engine-llm.js
+backend/test-qiniu-llm.js
+backend/test-real-decision.js

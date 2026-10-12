@@ -6,19 +6,31 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const root = path.resolve(__dirname, '..');
-const indexPath = path.join(root, 'dist', 'index.html');
+const indexPath = path.join(root, 'dist', process.argv.includes('--capabilities-demo')
+  ? 'capabilities.html' : 'index.html');
 let mainWindow;
 let busy = false;
 let segmentChild, segmentTask;
 let segmentCanceled = false;
 const subject = require('./subject.cjs')(app, root);
-app.on('before-quit', () => subject.stop());
+let v2Runtime, quitting = false, quitReady = false;
+const legacyTasks = new Set();
+// will-quit 在窗口确认关闭之后触发，用户选择继续编辑时不停止任务。
+app.on('will-quit', event => {
+  if (quitReady) return;
+  event.preventDefault();
+  if (quitting) return;
+  quitting = true;
+  if (segmentChild) segmentChild.kill();
+  Promise.allSettled([subject.shutdown(), v2Runtime?.shutdown(), ...legacyTasks]).then(results => {
+    for (const result of results) {
+      if (result.status === 'rejected') console.error('退出任务清理失败', result.reason);
+    }
+  })
+    .finally(() => { quitReady = true; app.quit(); });
+});
 
-function engineCommand() {
-  return app.isPackaged
-    ? [path.join(process.resourcesPath, 'engine', 'relief-engine.exe'), []]
-    : [path.join(root, '.venv', 'Scripts', 'python.exe'), [path.join(root, 'engine', 'main.py')]];
-}
+const engineCommand = require('./engine-command.cjs')(app, root, process.resourcesPath);
 
 async function runEngine(job, destination) {
   const serialized = JSON.stringify(job);
@@ -39,9 +51,10 @@ async function runEngine(job, destination) {
       if (job.action === 'segment') segmentChild = child;
       let stdout = '';
       let stderr = '';
+      let processError;
       const timer = setTimeout(() => {
+        processError = new Error('算法处理超过 120 秒，请减小图片或层数后重试');
         child.kill();
-        reject(new Error('算法处理超过 120 秒，请减小图片或层数后重试'));
       }, 120000);
       child.stdout.on('data', (chunk) => {
         stdout = (stdout + chunk.toString()).slice(-1_000_000);
@@ -51,12 +64,13 @@ async function runEngine(job, destination) {
       });
       child.on('error', (error) => {
         clearTimeout(timer);
-        reject(error);
+        processError = error;
       });
       child.on('close', (code) => {
         if (segmentChild === child) segmentChild = null;
         clearTimeout(timer);
         try {
+          if (processError) throw processError;
           const response = JSON.parse(stdout.trim());
           if (code !== 0 || !response.ok) throw new Error(response.error?.message || stderr);
           resolve(response);
@@ -73,7 +87,7 @@ async function runEngine(job, destination) {
     }
     return result;
   } finally {
-    await fs.rm(temp, { recursive: true, force: true });
+    await fs.rm(temp, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 }
 
@@ -82,17 +96,23 @@ function handle(name, action, concurrent = false) {
     if (
       event.sender !== mainWindow.webContents ||
       event.senderFrame !== mainWindow.webContents.mainFrame ||
-      event.senderFrame.url !== pathToFileURL(indexPath).href
+      event.senderFrame.url !== pathToFileURL(indexPath).href + (process.argv.includes('--d1') ? '?d1=1' : '')
     ) {
       throw new Error('不允许的调用来源');
     }
+    if (quitting) throw new Error('程序正在退出');
     if (concurrent) return action(value);
     if (busy) throw new Error('正在处理上一项任务');
     busy = true;
+    let finished;
+    const done = new Promise(resolve => { finished = resolve; });
+    legacyTasks.add(done);
     try {
       return await action(value);
     } finally {
       busy = false;
+      legacyTasks.delete(done);
+      finished();
     }
   });
 }
@@ -102,6 +122,35 @@ async function chooseSave(defaultPath, filters) {
 }
 
 function registerHandlers() {
+  v2Runtime = require('./v2.cjs')({ handle, engineCommand, chooseSave,
+    prepareEngine: async action => {
+      if (!['import', 'recognition'].includes(action)) return;
+      if (busy) throw new Error('请等待当前任务完成后再识别');
+      // 等待常驻模型进程退出，避免新旧识别引擎同时占用显存。
+      await subject.stop();
+    },
+    chooseOpen: () => dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'], filters: [{ name: '浮雕工程', extensions: ['json'] }],
+    }),
+  });
+  handle('relief:export-stl', async (input) => {
+    const result = await chooseSave('浮雕模型.stl', [{ name: 'STL 模型', extensions: ['stl'] }]);
+    if (result.canceled || !result.filePath) return null;
+    const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'relief-stl-'));
+    const output = path.join(temporary, 'output');
+    const target = result.filePath;
+    const staged = `${target}.tmp-${Date.now()}`;
+    try {
+      await runEngine({ action: 'stl', project: input?.project, options: input?.options }, output);
+      const info = JSON.parse(await fs.readFile(path.join(output, 'mesh-info.json'), 'utf8'));
+      await fs.copyFile(path.join(output, 'model.stl'), staged);
+      await fs.rename(staged, target);
+      return { path: target, repairedPixels: info.repairedPixels };
+    } finally {
+      await fs.rm(staged, { force: true });
+      await fs.rm(temporary, { recursive: true, force: true });
+    }
+  });
   handle(
     'relief:segment-cancel',
     async () => {
@@ -112,8 +161,12 @@ function registerHandlers() {
     true,
   );
   handle('relief:repair', (input) => runEngine({ ...input, action: 'repair' }));
-  handle('relief:refine', (input) => subject.request({ ...input, action: 'refine' }));
-  handle('relief:subject', (input) => subject.request(input));
+  const subjectRequest = input => {
+    if (v2Runtime.hasGpuTasks()) throw new Error('正在执行识别任务，请稍后重试');
+    return subject.request(input);
+  };
+  handle('relief:refine', (input) => subjectRequest({ ...input, action: 'refine' }));
+  handle('relief:subject', subjectRequest);
   handle('relief:subject-status', () => subject.status(), true);
   handle('relief:subject-cancel', () => subject.stop(), true);
   handle('relief:info', () => ({ version: app.getVersion(), platform: process.platform }));
@@ -214,6 +267,6 @@ app.whenReady().then(() => {
     if (choice === 1) event.preventDefault();
   });
   registerHandlers();
-  mainWindow.loadFile(indexPath);
+  mainWindow.loadFile(indexPath, process.argv.includes('--d1') ? { query: { d1: '1' } } : undefined);
 });
 app.on('window-all-closed', () => app.quit());

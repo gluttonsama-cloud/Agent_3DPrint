@@ -1,0 +1,13 @@
+:root { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; color: #163d35; background: #f3f1e8; }
+body { margin: 0; } main { padding: 32px; max-width: 1600px; margin: auto; }
+h1 { font-size: 34px; margin: 12px 0; } small { letter-spacing: .15em; }
+header p { color: #5b6c63; } nav { display: flex; gap: 10px; flex-wrap: wrap; margin: 24px 0; }
+.capability-grid { display: grid; grid-template-columns: minmax(260px,1fr) minmax(300px,1.6fr) minmax(260px,1fr); gap: 20px; }
+section { background: #fffef8; border: 1px solid #d9dfd2; border-radius: 12px; padding: 20px; }
+section section { border: 0; padding: 0; } h2 { margin-top: 0; font-size: 21px; }
+label { display: block; margin: 16px 0; font-size: 14px; } input:not([type=checkbox]),select { display: block; width: 100%; box-sizing: border-box; padding: 9px; margin-top: 7px; }
+button { background: #194f40; color: #fff; border: 0; padding: 10px 14px; border-radius: 6px; cursor: pointer; margin: 4px; }
+button:disabled { opacity: .4; cursor: default; } input[type=range] { accent-color: #24775b; }
+p,li,summary { font-size: 14px; line-height: 1.7; } output { font-family: monospace; overflow-wrap: anywhere; }
+.preview-host { min-height: 430px; width: 100%; height: 52vh; } .preview-hint { font-size: 12px; }
+@media(max-width:1000px) { .capability-grid { grid-template-columns: 1fr; } }

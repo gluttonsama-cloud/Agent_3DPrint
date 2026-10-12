@@ -1,5 +1,16 @@
 import { expect, it } from 'vitest';
 import { previewData } from './preview-model';
+import { makeFixture } from './contracts/mock';
+
+it('v2 预览读取像素高度，删除最高点不改变其余毫米比例', () => {
+  const project = makeFixture();
+  const before = previewData(project);
+  project.heights[4] = project.heights[8] = 0;
+  const after = previewData(project);
+  expect(before.heights[2]).toBe(3);
+  expect(after.heights[2]).toBe(3);
+  expect(after.millimeters[2]).toBeCloseTo(0.3);
+});
 
 it('同高度工程的高复杂度差异也必须在创建三维数组前拒绝', () => {
   const width=512,height=512;
