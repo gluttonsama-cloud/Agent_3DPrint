@@ -118,7 +118,7 @@ test(`A7 真窗口关闭等待 ${mode} 引擎与临时目录退出，取消关�
     let enginePids: number[] = [];
     for (let attempt = 0; attempt < 40; attempt++) {
       enginePids = JSON.parse(execFileSync(python, ['-c',
-        'import psutil,json,sys; print(json.dumps([p.pid for p in psutil.Process(int(sys.argv[1])).children(recursive=True) if "python" in p.name().lower() or p.name().lower() == "relief-engine.exe"]))',
+        'import psutil,json,sys; print(json.dumps([p.pid for p in psutil.Process(int(sys.argv[1])).children(recursive=True) if "python" in p.name().lower() or p.name().lower() in ("relief-engine.exe", "subject-engine.exe")]))',
         String(app.process().pid)], { encoding: 'utf8' }));
       if (enginePids.length) break;
       await new Promise(resolve => setTimeout(resolve, 50));
