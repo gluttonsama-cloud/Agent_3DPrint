@@ -1,17 +1,21 @@
 # Relief Studio · 浮雕制版
 
+当前候选版本为 **0.4.2-d2.4**。从 [Release 发布页](https://github.com/gluttonsama-cloud/Agent_3DPrint/releases/tag/relief-studio-v0.4.2-d2.4) 下载 `Relief-Studio-Complete-Setup-0.4.2-d2.4.exe`，运行后选择是否启用 AI。安装程序会检查显卡驱动，并自动下载、校验模型和 GPU 运行时；无需手工安装 Python 或合并分卷。完整步骤见 [GPU完整安装指引](docs/GPU完整安装指引.md)。
+
+## 编辑功能与历史版本
+
 0.4.1 在 0.4.0 的识别、主体提取和细化功能上新增智能手动修整与 STL 导出。
 在左侧选一层，智能点选、框选或圈选，再点“清除”或“保留”。
 “保留”只保留当前层圈内部分，清除当前层圈外部分；其他层保持不变。
 圈选默认自动贴边，智能点选可调整宽容度；原有画笔、分区属性等收进高级入口。
 操作说明与验证记录见 [手动修整与 STL](docs/handable-0.4.1.md)。
-本版安装包为 `release/Relief Studio Setup 0.4.1.exe`。
+0.4.1 的历史安装包路径为 `release/Relief Studio Setup 0.4.1.exe`。
 
 ### 旧版本记录
 
 0.3.0 增加“自动分色 / 主体提取”识别预览。导入后无需预填数量；确认结果后才应用，
 新分色高度全为 0。复杂图可用本地 GPU 点选主体，背景保留原色为 0 层，主体统一设置层数。
-当前交付在 `release/0.3.0/`；安装包仅包含基础引擎，GPU 用户另外放置 `model-runtime` 目录。
+当时交付在 `release/0.3.0/`；历史安装包仅包含基础引擎，GPU 用户另外放置 `model-runtime` 目录。
 本机免安装目录已配置模型包。完整记录与精度待验收项见 `docs/recognition-0.3.0.md`。
 
 用于 LOGO、文字及色块图的离线 Windows 浮雕分层演示。颜色与高度分别编辑，输出可恢复工程、
@@ -19,7 +23,7 @@
 
 ## 运行演示
 
-可安装包：`release/Relief Studio Setup 0.4.1.exe`。
+可安装包：`release/gpu-complete/Relief-Studio-Complete-Setup-0.4.2-d2.4.exe`，或下载上述 Release 附件。
 免安装目录：`release/win-unpacked/`，运行其中 `Relief Studio.exe`；分发时必须保留整个目录。
 
 1. 点击“打开示例工程”，查看 55 mm 科尔沁徽标。
@@ -68,7 +72,7 @@ $env:RELIEF_TEST_PACKAGED='1'
 npm run test:e2e
 ```
 
-构建可联网安装依赖；产物运行无网络请求。`.venv`、模型实验环境、构建产物和测试截图均不入 Git。
+构建可联网安装依赖；完整安装程序启用 AI 时需联网下载模型，也支持同目录离线分卷。安装完成后的图像处理在本机运行。`.venv`、模型实验环境、构建产物和测试截图均不入 Git。
 检查来源和许可记录见 `docs/third-party.md`。
 
 ## 文件式算法接口 v1

@@ -33,6 +33,7 @@ try {
   $driverApproved = $false
   if (!$status.HasNvidia) {
     Inform '未检测到 NVIDIA 显卡，软件已安装，可使用手工编辑和导出。自动主体识别暂不可用。'
+    if ($NonInteractive -and $InstallGpu) { exit 1 }
     exit 0
   }
   if (!$status.DriverReady) {
