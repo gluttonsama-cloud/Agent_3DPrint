@@ -38,7 +38,7 @@ try {
   }
   if (!$status.DriverReady) {
     if ($NonInteractive) { throw '驱动不兼容；无人值守安装不会擅自修改显卡驱动。' }
-    if (!(Ask '显卡驱动缺失或不兼容。是否自动安装适合本机的 NVIDIA 驱动及 AI 模型？将通过 Windows Update 安装驱动并下载约 2.86 GB 的模型配套。选择“否”可继续手工编辑。')) { exit 0 }
+    if (!(Ask '显卡驱动缺失或不兼容。是否自动安装适合本机的 NVIDIA 驱动及 AI 模型？将通过 Windows Update 安装驱动并下载约 2.61 GB 的模型配套。选择“否”可继续手工编辑。')) { exit 0 }
     $driverApproved = $true
     $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $PSCommandPath + '"'),
       '-InstallDirectory', ('"' + $InstallDirectory + '"'), '-DriverOnly', '-NonInteractive')
@@ -46,7 +46,7 @@ try {
     if ($process.ExitCode -eq 3) { Inform '驱动已安装，需要重启电脑。重启后再次运行安装程序，即可安装模型。'; exit 3 }
     if ($process.ExitCode -ne 0) { throw '自动驱动安装失败；软件可继续手工编辑。请安装 NVIDIA 官方驱动后重试。' }
   }
-  if (!$NonInteractive -and !$driverApproved -and !(Ask '是否启用 AI 主体识别？安装程序会自动下载并校验模型与运行时，下载量约 2.86 GB。选择“否”可稍后再运行安装程序添加。')) { exit 0 }
+  if (!$NonInteractive -and !$driverApproved -and !(Ask '是否启用 AI 主体识别？安装程序会自动下载并校验模型与运行时，下载量约 2.61 GB。选择“否”可稍后再运行安装程序添加。')) { exit 0 }
   $manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'gpu-manifest.json') -Raw | ConvertFrom-Json
   $destination = Get-ReliefChildPath $RuntimeRoot 'model-runtime'
   if (Test-ReliefRuntime $destination $manifest) {
