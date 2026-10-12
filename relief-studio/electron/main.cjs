@@ -123,6 +123,12 @@ async function chooseSave(defaultPath, filters) {
 
 function registerHandlers() {
   v2Runtime = require('./v2.cjs')({ handle, engineCommand, chooseSave,
+    prepareEngine: async action => {
+      if (!['import', 'recognition'].includes(action)) return;
+      if (busy) throw new Error('请等待当前任务完成后再识别');
+      // 等待常驻模型进程退出，避免新旧识别引擎同时占用显存。
+      await subject.stop();
+    },
     chooseOpen: () => dialog.showOpenDialog(mainWindow, {
       properties: ['openFile'], filters: [{ name: '浮雕工程', extensions: ['json'] }],
     }),
@@ -155,8 +161,12 @@ function registerHandlers() {
     true,
   );
   handle('relief:repair', (input) => runEngine({ ...input, action: 'repair' }));
-  handle('relief:refine', (input) => subject.request({ ...input, action: 'refine' }));
-  handle('relief:subject', (input) => subject.request(input));
+  const subjectRequest = input => {
+    if (v2Runtime.hasGpuTasks()) throw new Error('正在执行识别任务，请稍后重试');
+    return subject.request(input);
+  };
+  handle('relief:refine', (input) => subjectRequest({ ...input, action: 'refine' }));
+  handle('relief:subject', subjectRequest);
   handle('relief:subject-status', () => subject.status(), true);
   handle('relief:subject-cancel', () => subject.stop(), true);
   handle('relief:info', () => ({ version: app.getVersion(), platform: process.platform }));

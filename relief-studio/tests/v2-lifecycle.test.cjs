@@ -13,6 +13,49 @@ function harness(options = {}) {
   return handlers;
 }
 
+test('识别等待旧 GPU 资源释放，等待期间保留任务占用', async () => {
+  let release;
+  let engineCalls = 0;
+  const gate = new Promise(resolve => { release = resolve; });
+  let preparing = false;
+  const handlers = harness({ prepareEngine: async () => { preparing = true; await gate; },
+    engineCommand: () => {
+      engineCalls++;
+      return [process.execPath, [path.join(__dirname, 'fixtures/v2/task-engine.cjs')]];
+    } });
+  const pending = handlers['v2:recognition']({ requestId: 'prepare-gpu', payload: {} });
+  try {
+    for (let attempt = 0; attempt < 100 && !preparing; attempt++) await delay(5);
+    assert.equal(preparing, true, '必须先完成资源交接');
+    assert.equal(handlers.runtime.hasGpuTasks(), true);
+    assert.equal(engineCalls, 0, '资源交接完成前不得调用引擎入口');
+    assert.equal(await handlers['v2:progress']({ requestId: 'prepare-gpu' }), null, '交接前不得启动新进程');
+    release();
+    assert.equal((await pending).result.status, 'success');
+    assert.equal(engineCalls, 1);
+    assert.equal(handlers.runtime.hasGpuTasks(), false);
+  } finally { release(); await pending; }
+});
+
+test('资源交接时取消导入，不启动新的 GPU 进程', async () => {
+  let release;
+  let engineCalls = 0;
+  const gate = new Promise(resolve => { release = resolve; });
+  let preparing = false;
+  const handlers = harness({ prepareEngine: async () => { preparing = true; await gate; },
+    engineCommand: () => { engineCalls++; throw new Error('已取消时不应启动'); } });
+  const pending = handlers['v2:import']({ requestId: 'cancel-prepare', payload: {} });
+  try {
+    for (let attempt = 0; attempt < 100 && !preparing; attempt++) await delay(5);
+    assert.equal(preparing, true);
+    await handlers['v2:cancel']({ requestId: 'cancel-prepare' });
+    release();
+    assert.equal((await pending).result.status, 'cancelled');
+    assert.equal(engineCalls, 0, '取消后不得调用引擎入口');
+    assert.equal(handlers.runtime.hasGpuTasks(), false);
+  } finally { release(); await pending; }
+});
+
 test('取消无响应的识别进程后，清理目录并释放任务槽', async () => {
   const handlers = harness();
   const pending = handlers['v2:recognition']({ requestId: 'hang', payload: { hang: true } });

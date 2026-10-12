@@ -51,7 +51,7 @@ module.exports = function subjectRuntime(app, root) {
       if (stopping || retiring.size) return Promise.reject(new Error('模型进程正在退出，请稍后重试'));
       if (!fs.existsSync(command) || !fs.existsSync(checkpoint) || !fs.existsSync(foreground))
         return Promise.reject(
-          new Error('尚未安装 GPU 主体模型包，请将 model-runtime 放在程序同目录。'),
+          new Error('尚未安装 AI 模型，请重新运行完整安装程序，并选择启用 AI。'),
         );
       if (!job || !['propose', 'predict', 'refine'].includes(job.action) || typeof job.id !== 'string')
         return Promise.reject(new Error('主体识别请求无效'));

@@ -3,7 +3,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 
-module.exports = function registerV2({ handle, engineCommand, chooseSave, chooseOpen, cancelGraceMs = 10000 }) {
+module.exports = function registerV2({ handle, engineCommand, chooseSave, chooseOpen, prepareEngine, cancelGraceMs = 10000 }) {
   const tasks = new Map();
   let stopping = false;
   const fail = (base, message) => ({ status: 'error', base, code: 'V2_IPC_FAILED', message });
@@ -42,6 +42,8 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
       const output = path.join(task.directory, 'result');
       await fs.writeFile(jobPath, job, 'utf8');
       if (task.cancelled) return { requestId, result: { status: 'cancelled', base } };
+      await prepareEngine?.(action);
+      if (task.cancelled || stopping) return { requestId, result: { status: 'cancelled', base } };
       const [command, args] = engineCommand(action);
       await new Promise((resolve, reject) => {
         const child = spawn(command, [...args, '--job', jobPath, '--out', output], {
@@ -104,6 +106,7 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
     catch { return null; }
   }, true);
   return {
+    hasGpuTasks: () => [...tasks.values()].some(task => ['import', 'recognition'].includes(task.action)),
     async shutdown() {
       stopping = true;
       const pending = [...tasks.entries()];
