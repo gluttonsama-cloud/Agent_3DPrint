@@ -9,7 +9,7 @@ import { decodeProject, encodeProject } from '../src/project-codec';
 test('A7 真实 IPC：透明导入、人工保护、候选撤销及缺失模型后继续输出', async () => {
   const directory = path.join(process.cwd(), 'artifacts', `recognition-v2-${Date.now()}`);
   await fs.mkdir(directory, { recursive: true });
-  const env = { ...process.env };
+  const env: Record<string, string> = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
   delete env.ELECTRON_RUN_AS_NODE;
   // 用确定不存在的模型目录验证错误路径，不依赖测试机是否已安装模型。
   env.RELIEF_BIREFNET_DIRECTORY = path.join(directory, 'missing-model');
@@ -19,7 +19,7 @@ test('A7 真实 IPC：透明导入、人工保护、候选撤销及缺失模型�
     delete env.PYTHONHOME; delete env.PYTHONPATH;
   }
   const app = await electron.launch(packaged ? {
-    executablePath: path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), env,
+    executablePath: env.RELIEF_TEST_EXECUTABLE || path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), env,
   } : { args: [process.cwd()], env });
   try {
     expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(packaged);
@@ -131,14 +131,14 @@ test('A7 真实 IPC：透明导入、人工保护、候选撤销及缺失模型�
 });
 
 test('A7 2048 像素真实局部识别：诊断工作坐标、范围外不变及一次撤销', async () => {
-  const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
+  const env: Record<string, string> = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)); delete env.ELECTRON_RUN_AS_NODE;
   const packaged = env.RELIEF_TEST_PACKAGED === '1';
   if (packaged) {
     env.PATH = `${process.env.SystemRoot}\\System32`;
     delete env.PYTHONHOME; delete env.PYTHONPATH;
   }
   const app = await electron.launch(packaged ? {
-    executablePath: path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), env,
+    executablePath: env.RELIEF_TEST_EXECUTABLE || path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), env,
   } : { args: [process.cwd()], env });
   try {
     expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(packaged);

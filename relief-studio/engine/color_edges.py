@@ -12,8 +12,8 @@ def refine_color_edges(rgb, labels, palette):
                         cv2.COLOR_RGB2LAB)[0]
   separation = np.linalg.norm(centers[:, None]-centers, axis=2)
   np.fill_diagonal(separation, np.inf)
-  # 近似色容易把过渡像素当作另一色区；高对比图案保留原有稳定规则。
-  similar_colors = bool(separation.min() < 30)
+  # 仅对存在近似邻色的颜色收紧规则，无关高对比色保留原有保护。
+  similar_colors = np.any(separation < 30, axis=1)
   spread = cv2.dilate(rgb, kernel).astype(np.int16)-cv2.erode(rgb, kernel)
   flat = spread.max(axis=2) <= 12
   pixels = rgb.astype(np.float32)
@@ -21,11 +21,12 @@ def refine_color_edges(rgb, labels, palette):
   protected = np.zeros(labels.shape, dtype=bool)
   for index, color in enumerate(palette, 1):
     own = labels == index
+    similar = similar_colors[index-1]
     # 真实细线、单像素标点只要颜色明确也可作种子，无最小面积限制。
-    close = np.max(np.abs(pixels-color), axis=2) <= (6 if similar_colors else 32)
+    close = np.max(np.abs(pixels-color), axis=2) <= (6 if similar else 32)
     core = cv2.erode(own.astype(np.uint8), kernel,
                      borderType=cv2.BORDER_CONSTANT, borderValue=0) > 0
-    seed = own & (close | (core if similar_colors else flat & core))
+    seed = own & (close | (core if similar else flat & core))
     seeds.append(seed)
     protected |= seed
   uncertain = visible & ~protected
@@ -37,7 +38,7 @@ def refine_color_edges(rgb, labels, palette):
   for index, seed in enumerate(seeds, 1):
     if not seed.any():
       continue
-    if similar_colors:
+    if similar_colors[index-1]:
       spatial, nearest = cv2.distanceTransformWithLabels(
         (~seed).astype(np.uint8), cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL)
       colors = np.zeros((int(nearest.max())+1, 3), dtype=np.float32)

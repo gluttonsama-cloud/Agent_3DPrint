@@ -30,16 +30,7 @@ app.on('will-quit', event => {
     .finally(() => { quitReady = true; app.quit(); });
 });
 
-function engineCommand(action) {
-  if (!app.isPackaged && ['recognition', 'import'].includes(action)) {
-    const gpu = path.join(root, '.gpu-venv', 'Scripts', 'python.exe');
-    if (require('node:fs').existsSync(gpu))
-      return [gpu, [path.join(root, 'engine', 'main.py')]];
-  }
-  return app.isPackaged
-    ? [path.join(process.resourcesPath, 'engine', 'relief-engine.exe'), []]
-    : [path.join(root, '.venv', 'Scripts', 'python.exe'), [path.join(root, 'engine', 'main.py')]];
-}
+const engineCommand = require('./engine-command.cjs')(app, root, process.resourcesPath);
 
 async function runEngine(job, destination) {
   const serialized = JSON.stringify(job);

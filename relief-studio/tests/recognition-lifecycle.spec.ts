@@ -16,10 +16,10 @@ async function launch(env: Record<string, string>) {
     delete env.PYTHONHOME; delete env.PYTHONPATH;
   }
   const app = await electron.launch(packaged ? {
-    executablePath: path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), env,
+    executablePath: env.RELIEF_TEST_EXECUTABLE || path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), env,
   } : { args: [process.cwd()], env });
   expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(packaged);
-  if (packaged) expect(await app.evaluate(({ app }) => app.getVersion())).toBe('0.4.2-d2.3');
+  if (packaged) expect(await app.evaluate(({ app }) => app.getVersion())).toBe(JSON.parse(await fs.readFile('package.json', 'utf8')).version);
   return app;
 }
 

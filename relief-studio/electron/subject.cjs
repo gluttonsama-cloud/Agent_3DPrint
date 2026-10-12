@@ -12,7 +12,7 @@ module.exports = function subjectRuntime(app, root) {
   let stopping = false;
   const modern = path.join(root, 'model-runtime');
   const directory = app.isPackaged
-    ? path.join(path.dirname(app.getPath('exe')), 'model-runtime')
+    ? require('./model-directory.cjs')(app)
     : fs.existsSync(path.join(modern, 'sam2.1_hiera_tiny.pt')) &&
         fs.existsSync(path.join(modern, 'birefnet-hr', 'model.safetensors'))
       ? modern

@@ -3,11 +3,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 async function launchCapabilities() {
-  const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
+  const env: Record<string, string> = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)); delete env.ELECTRON_RUN_AS_NODE;
   if (env.RELIEF_TEST_PACKAGED === '1') {
     env.PATH = `${process.env.SystemRoot}\\System32`;
     delete env.PYTHONHOME; delete env.PYTHONPATH;
-    return electron.launch({ executablePath: path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'),
+    return electron.launch({ executablePath: env.RELIEF_TEST_EXECUTABLE || path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'),
       args: ['--capabilities-demo'], env });
   }
   return electron.launch({ args: [process.cwd(), '--capabilities-demo'], env });
