@@ -83,7 +83,7 @@ npm install @langchain/openai
 
 ```bash
 # 七牛云 AI 配置
-QINIU_AI_API_KEY=sk-ade295a43028dab39ad35d7fd61956ef5fc7ebf10b7e1c357bd55ce92f79c5e0
+QINIU_AI_API_KEY=YOUR_QINIU_API_KEY
 QINIU_AI_BASE_URL=https://api.qnaigc.com/v1
 
 # 主模型：GLM-5
