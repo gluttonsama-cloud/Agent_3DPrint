@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from project_v2 import decode_project, decode_raster
+from project_v2 import decode_project, decode_raster, migrate_v1
 from height_ops import run_height
 
 
@@ -127,6 +127,43 @@ class HeightTests(unittest.TestCase):
     labels[10, 8:16] = 2
     result = applied(value, run_height(value, {'kind': 'suggest', 'maxLayers': 10}))
     self.assertEqual(result['heights'].reshape(24, 24)[10, 10], 10)
+
+  def test_suggest_keeps_ambiguous_logo_region_heights(self):
+    path = Path(__file__).resolve().parents[2]/'samples/sample-project.json'
+    value = migrate_v1(json.loads(path.read_text(encoding='utf-8')))
+    candidate = run_height(value, {'kind': 'suggest', 'maxLayers': 10})
+    result = applied(value, candidate)
+    np.testing.assert_array_equal(result['heights'], value['heights'])
+    self.assertEqual(candidate['blocks'], [])
+    self.assertGreater(candidate['diagnostics']['ambiguousRegionCount'], 0)
+    for field in ('colors', 'labels', 'protection'):
+      np.testing.assert_array_equal(result[field], value[field])
+
+  def test_suggest_clear_roles_respect_selection_protection_and_limit(self):
+    value = fixture(24, 24)
+    value['labels'].reshape(24, 24)[8:16, 8:16] = 2
+    selection = np.zeros(24*24, dtype='uint8')
+    selection.reshape(24, 24)[:, :12] = 1
+    value['protection'][10*24+10] = 4
+    result = applied(value, run_height(value, {'kind': 'suggest', 'maxLayers': 4}, selection))
+    self.assertEqual(result['heights'][4*24+4], 3)
+    self.assertEqual(result['heights'][9*24+9], 4)
+    self.assertEqual(result['heights'][10*24+10], 12)
+    np.testing.assert_array_equal(result['heights'][selection == 0], value['heights'][selection == 0])
+
+  def test_suggest_conflicting_roles_do_not_depend_on_region_id_order(self):
+    value = fixture(32, 32)
+    labels = value['labels'].reshape(32, 32)
+    # 同一色区既有外围底面，也有内部孤岛，不能按遍历顺序猜层级。
+    labels[6:26, 6:26] = 2
+    labels[12:20, 12:20] = 1
+    candidate = run_height(value, {'kind': 'suggest', 'maxLayers': 10})
+    result = applied(value, candidate)
+    np.testing.assert_array_equal(result['heights'], value['heights'])
+    swapped = copy.deepcopy(value)
+    swapped['labels'] = np.where(value['labels'] == 1, 2, 1).astype('uint16')
+    other = applied(swapped, run_height(swapped, {'kind': 'suggest', 'maxLayers': 10}))
+    np.testing.assert_array_equal(result['heights'], other['heights'])
 
 
 if __name__ == '__main__':

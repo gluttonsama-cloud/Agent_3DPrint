@@ -403,6 +403,14 @@ export default function App() {
       const status = store.current!.accept(candidate, controller.signal);
       if (status === 'applied') changed();
       setNotice(({ applied: '高度已应用', stale: '已丢弃过期结果', cancelled: '已取消', error: '处理失败，工程保持不变' })[status]);
+      if (status === 'applied' && result.status === 'success' && request.operation.kind === 'suggest') {
+        const conflicts = result.value.diagnostics?.ambiguousRegionCount;
+        setNotice(!result.value.blocks.length
+          ? '没有可安全应用的高度变化，已保留现有高度'
+          : typeof conflicts === 'number' && conflicts > 0
+            ? `高度建议已应用；${conflicts} 个层级不明确的区域保持原高`
+            : '高度建议已应用');
+      }
       if (status === 'error' && result.status === 'error') setError(result.message);
     } catch (value) { setError(String(value)); }
     finally { if (task.current === controller) { task.current = null; setCapabilityBusy(false); } }

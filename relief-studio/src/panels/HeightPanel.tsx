@@ -50,9 +50,10 @@ export function HeightPanel({ snapshot, selection, busy, onPreview, onRequest, o
       {busy ? '取消处理' : '取消预览'}
     </button>
     <details className="height-advanced"><summary>高级处理</summary>
-      <label className="stack-field">自动处理<select value={mode} disabled={busy} onChange={e => setMode(e.target.value as typeof mode)}>
-        <option value="uniform">均高</option><option value="suggest">保守结构建议</option>
+      <label className="stack-field">自动处理<select aria-label="自动处理" value={mode} disabled={busy} onChange={e => setMode(e.target.value as typeof mode)}>
+        <option value="uniform">均高</option><option value="suggest">轮廓层级建议</option>
       </select></label>
+      {mode === 'suggest' && <p className="height-note">只参考闭合轮廓，不识别文字或真实立体结构。层级不明确时保持原高。</p>}
       <button className="full-button" disabled={busy || !validLayers} onClick={() => request(mode === 'uniform' ? { kind: mode, layers }
         : { kind: mode, maxLayers: layers })}>应用{mode === 'uniform' ? '均高' : '结构建议'}</button>
       <label className="stack-field">整体比例<input type="number" min={0} max={256} step={0.1} value={factor} disabled={busy}

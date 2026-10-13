@@ -67,6 +67,13 @@ def run_height(snapshot, operation, selection=None, cancelled=lambda: False):
   elif kind == 'suggest':
     maximum = number(operation, 'maxLayers', 0, 256, True)
     proposals = np.full(shape, -1, dtype='int16')
+    roles = {}
+
+    def propose(mask, layers):
+      # 保留全部角色证据，不能让后遍历的字母孔洞覆盖先前判断。
+      for label in np.unique(labels[mask]):
+        roles.setdefault(int(label), set()).add(layers)
+      proposals[mask] = layers
     # 只使用明确闭合包含关系：外层底面 3，内部装饰 6，内部细线 10。
     # 没有包含证据的孤立色块、文字与同色断开部分均保持现高。
     for region_id in np.unique(labels):
@@ -95,11 +102,16 @@ def run_height(snapshot, operation, selection=None, cancelled=lambda: False):
         component = int(components[outer_point[1], outer_point[0]])
         if stats[component, cv2.CC_STAT_AREA] < 16 or float(distance[components == component].max()) < 2:
           continue
-        proposals[components == component] = 3
+        propose(components == component, 3)
         for child_id in np.unique(labels[interior]):
           child = interior & (labels == child_id)
           child_distance = cv2.distanceTransform(np.pad(child.astype('uint8'), 1), cv2.DIST_L2, 5)[1:-1, 1:-1]
-          proposals[child] = 10 if float(child_distance.max())*2 <= 3 else 6
+          propose(child, 10 if float(child_distance.max())*2 <= 3 else 6)
+    # 同一区域有相互矛盾的底面/装饰/细线判断时，整区保持现高。
+    # 文字的封闭孔洞不能被当作可靠的立体语义；不改色、不填孔。
+    ambiguous = [label for label, candidates in roles.items() if len(candidates) > 1]
+    if ambiguous:
+      proposals[np.isin(labels, ambiguous)] = -1
     suggested = proposals.ravel()
     change = target & (suggested >= 0)
     values[change] = np.minimum(maximum, suggested[change])
@@ -140,7 +152,8 @@ def run_height(snapshot, operation, selection=None, cancelled=lambda: False):
   check_cancel(cancelled)
   result = patch(snapshot, changes, f'高度操作：{kind}')
   if kind == 'suggest':
-    result['diagnostics'] = {'reason': '仅明确闭合包含结构使用底面3/装饰6/细节10；未知结构保持现高',
+    result['diagnostics'] = {'reason': '仅层级判断一致的闭合结构使用底面3/装饰6/细节10；冲突及未知区域保持现高',
+                             'ambiguousRegionCount': len(ambiguous),
                              'classifiedPixels': int(change.sum()),
                              'unchangedUnknownPixels': int((target & (suggested < 0)).sum())}
   return result
