@@ -133,13 +133,65 @@ select:disabled {
   width: 100%;
   margin: 0;
 }
-.region-list { min-height: 96px; }
+.region-list { min-height: 180px; }
 .selection-scope {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 18px 12px;
   font-size: 12px;
+}
+.left-panel .sidebar-section {
+  padding: 12px 12px;
+}
+.source-controls .full-button {
+  margin: 0;
+}
+.current-region {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.current-region strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.current-region .swatch {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+.trim-panel .field-row {
+  margin: 14px 0 10px;
+  font-size: 12px;
+}
+.trim-panel .trim-actions {
+  margin-top: 16px;
+  gap: 6px;
+}
+.trim-panel .trim-actions button {
+  min-height: 36px;
+  padding-inline: 6px;
+  font-size: 12px;
+}
+.properties-scroll > details > summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  color: #596658;
+  font-size: 12px;
+  font-weight: 600;
+}
+.scope-badge {
+  margin-left: auto;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 10px;
+  white-space: nowrap;
 }
 .sidebar-preview {
   border-bottom: 1px solid var(--line);
@@ -227,9 +279,9 @@ h2 {
 }
 .region-card {
   border-radius: 8px;
-  padding: 12px 10px;
-  margin-bottom: 7px;
-  min-height: 64px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  min-height: 52px;
 }
 .region-card.selected {
   background: #f6eee3;
@@ -308,6 +360,10 @@ h2 {
   border-color: #ddc3a4;
 }
 .tool-options {
+  height: auto;
+  min-height: 37px;
+  gap: 8px 12px;
+  padding: 6px 12px;
   background: #f9faf5;
   border-bottom-color: #e7e9df;
 }

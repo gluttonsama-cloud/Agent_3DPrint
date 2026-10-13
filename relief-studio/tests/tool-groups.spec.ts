@@ -82,8 +82,19 @@ test('三个入口切换模式，整个区域支持追加减去且不修改工�
     await expect(page.getByRole('button', { name: '只留选中部分', exact: true })).toBeVisible();
     await page.setViewportSize({ width: 1100, height: 720 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    expect(await page.locator('.region-list').evaluate(node => node.clientHeight)).toBeGreaterThanOrEqual(90);
+    expect(await page.locator('.region-list').evaluate(node => node.clientHeight)).toBeGreaterThanOrEqual(180);
+    const listBox = (await page.locator('.region-list').boundingBox())!;
+    const lastRegionBox = (await page.locator('.region-card').last().boundingBox())!;
+    expect(lastRegionBox.y + lastRegionBox.height).toBeLessThanOrEqual(listBox.y + listBox.height);
+    await expect(page.getByLabel('区域层数', { exact: true })).toBeVisible();
     await page.screenshot({ path: 'artifacts/tool-groups.png' });
+    await page.setViewportSize({ width: 960, height: 760 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.getByRole('button', { name: '只留选中部分', exact: true })).toBeVisible();
+    const toolbarBox = (await page.locator('.tool-options').boundingBox())!;
+    const radiusBox = (await page.getByLabel('笔刷半径').boundingBox())!;
+    expect(radiusBox.y + radiusBox.height).toBeLessThanOrEqual(toolbarBox.y + toolbarBox.height);
+    await page.screenshot({ path: 'artifacts/tool-groups-compact.png' });
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach(window => window.destroy()));
     await app.close();

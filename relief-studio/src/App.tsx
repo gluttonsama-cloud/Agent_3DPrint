@@ -504,15 +504,15 @@ export default function App() {
               <ToolControls tool={tool} disabled={disabled || capabilityBusy} onSelect={activateTool} />
             </section>
           )}
-          <section className="sidebar-section">
-            <h2>源图像</h2>
-            <button
+          <section className="sidebar-section source-controls">
+            {!project && <h2>源图像</h2>}
+            {!project && <button
               className="full-button"
               disabled={disabled}
               onClick={() => file.current?.click()}
             >
               ＋ 导入图片
-            </button>
+            </button>}
             <input
               type="file"
               ref={file}
@@ -524,7 +524,7 @@ export default function App() {
                 if (value) importFile(value);
               }}
             />
-            <button
+            {project && <button
               className="full-button"
               disabled={disabled || !project}
               onClick={() =>
@@ -539,11 +539,10 @@ export default function App() {
               }
             >
               重新识别区域
-            </button>
-            <p className="empty-sidebar">导入后自动识别，可预览并调整</p>
-            <button className="text-button" disabled={disabled} onClick={sample}>
+            </button>}
+            {!project && <button className="text-button" disabled={disabled} onClick={sample}>
               打开示例工程
-            </button>
+            </button>}
           </section>
           {project && (
             <section className="sidebar-section">
@@ -710,18 +709,9 @@ export default function App() {
                         <option value="subtract">从选区减去</option>
                       </select>
                     </label>
-                    <span className="tool-description">
-                      {tool === 'smart'
-                        ? '点击当前层图案，自动沿相近颜色选取'
-                        : tool === 'rectangle'
-                          ? '拖出矩形范围'
-                          : tool === 'lasso'
-                            ? '沿轮廓附近圈选，松开后自动贴边'
-                            : tool === 'color'
-                              ? '选取同一分区的所有像素'
-                              : '仅选取相邻的同区像素'}
-                    </span>
-                    <small>{advanced ? '画布跨区域选取' : '画布仅选当前区域'}</small>
+                    <small className="scope-badge" title="画布选取范围；在更多区域操作中修改，Shift 追加、Alt 减去">
+                      {advanced ? '跨区域' : '当前区域'}
+                    </small>
                   </>
                 ) : tool === 'hand' ? (
                   <span>拖动画布平移；滚动查看放大后的图像</span>
@@ -797,9 +787,9 @@ export default function App() {
                   onError={setError}
                 />
               </div>
-              <div className="selection-bar">
+              <div className="selection-bar" aria-live="polite">
                 <span data-testid="selection-count" data-count={selection.length}>
-                  {selection.length
+                  {selecting ? '正在识别选区…' : selection.length
                     ? `已选 ${selection.length.toLocaleString()} 像素`
                     : '未选择像素'}
                 </span>
@@ -879,6 +869,40 @@ export default function App() {
         </section>
         <aside className="right-panel sidebar">
           <div className="properties-scroll">
+            {project && region && (
+              <section className="sidebar-section trim-panel" aria-label="当前区域">
+                <h2>当前区域</h2>
+                <div className="current-region">
+                  <span className="swatch" style={{ background: region.color }} aria-hidden="true" />
+                  <strong title={region.name}>{region.name}</strong>
+                </div>
+                <div className="field-row">
+                  <label>层数</label>
+                  <div className="stepper">
+                    <button aria-label="减少层数" disabled={disabled || region.layers === 0}
+                      onClick={() => updateRegion({ layers: region.layers - 1 })}>−</button>
+                    <NumberField label="区域层数" value={region.layers} disabled={disabled}
+                      onCommit={(layers) => updateRegion({ layers })} />
+                    <button aria-label="增加层数" disabled={disabled || region.layers === 256}
+                      onClick={() => updateRegion({ layers: region.layers + 1 })}>＋</button>
+                  </div>
+                </div>
+                <div className="height-presets">
+                  {[0, 5, 10, 20].map(value => (
+                    <button key={value} disabled={disabled} onClick={() => updateRegion({ layers: value })}>
+                      {value} 层
+                    </button>
+                  ))}
+                </div>
+                <div className="trim-actions">
+                  <button disabled={disabled || selecting || !selectedCount}
+                    title="清除当前区域选中的部分；可撤销" onClick={() => trimSelection('clear')}>清除</button>
+                  <button disabled={disabled || selecting || !selectedCount}
+                    title="删除当前区域未选中的部分，其他区域不变；可撤销"
+                    onClick={() => trimSelection('keep')}>只留选中部分</button>
+                </div>
+              </section>
+            )}
           {snapshot && <>
             {d1 && <section aria-label="D1 联调">
               <label>模拟场景<select value={scenario} onChange={event => setScenario(event.target.value as MockOptions['scenario'])}>
@@ -918,49 +942,8 @@ export default function App() {
                 )}
               </details>
             )}
-            {project && (
-              <section className="sidebar-section trim-panel">
-                <h2>修整当前层</h2>
-                <p className="current-layer-name">
-                  {region?.name} · {region?.layers} 层
-                </p>
-                <ol className="simple-steps">
-                  <li>左侧选择要修整的层</li>
-                  <li>点选图案，或圈出范围</li>
-                  <li>清除选中部分，或只留下选中部分</li>
-                </ol>
-                <div className="trim-actions">
-                  <button
-                    disabled={disabled || selecting || !selectedCount}
-                    onClick={() => trimSelection('clear')}
-                  >
-                    清除
-                  </button>
-                  <button
-                    className="primary"
-                    disabled={disabled || selecting || !selectedCount}
-                    onClick={() => trimSelection('keep')}
-                  >
-                    只留选中部分
-                  </button>
-                </div>
-                <p>
-                  <b>清除：</b>去掉当前层选中部分。
-                  <br />
-                  <b>只留选中部分：</b>删除当前层未选中的部分。
-                </p>
-                <small aria-live="polite">
-                  {selecting
-                    ? '正在识别选区…'
-                    : selectedCount
-                      ? `当前层选中 ${selectedCount.toLocaleString()} 像素`
-                      : '选中范围会高亮，确认后再操作'}
-                </small>
-                <small>其他层不变 · 操作后可撤销</small>
-              </section>
-            )}
             <details className="advanced-properties">
-              <summary>层属性与更多设置</summary>
+              <summary>更多区域操作</summary>
               <label className="selection-scope">
                 <input type="checkbox" aria-label="允许跨区域选取" checked={advanced} disabled={disabled}
                   onChange={event => { setAdvanced(event.target.checked); setSelectionReset(value => value + 1); }} />
@@ -978,42 +961,6 @@ export default function App() {
                         onCommit={(name) => updateRegion({ name })}
                       />
                     </label>
-                    <div className="field-row">
-                      <label>堆叠层数</label>
-                      <div className="stepper">
-                        <button
-                          aria-label="减少层数"
-                          disabled={disabled || region.layers === 0}
-                          onClick={() => updateRegion({ layers: region.layers - 1 })}
-                        >
-                          −
-                        </button>
-                        <NumberField
-                          label="区域层数"
-                          value={region.layers}
-                          disabled={disabled}
-                          onCommit={(layers) => updateRegion({ layers })}
-                        />
-                        <button
-                          aria-label="增加层数"
-                          disabled={disabled || region.layers === 256}
-                          onClick={() => updateRegion({ layers: region.layers + 1 })}
-                        >
-                          ＋
-                        </button>
-                      </div>
-                    </div>
-                    <div className="height-presets">
-                      {[0, 5, 10, 20].map((value) => (
-                        <button
-                          key={value}
-                          disabled={disabled}
-                          onClick={() => updateRegion({ layers: value })}
-                        >
-                          {value} 层
-                        </button>
-                      ))}
-                    </div>
                     <div className="field-row">
                       <label htmlFor="region-color">图案颜色</label>
                       <div className="color-control">
@@ -1136,18 +1083,9 @@ export default function App() {
             </details>
           </div>
           <section className="output-summary">
-            <h2>输出</h2>
             <div>
-              <span>分层数量</span>
+              <span>输出层数</span>
               <strong>{maxLayer} 层</strong>
-            </div>
-            <div>
-              <span>高度图</span>
-              <strong>16 位 PNG</strong>
-            </div>
-            <div>
-              <span>成品尺寸</span>
-              <strong>{project ? project.sizeMm.join(' × ') + ' mm' : '—'}</strong>
             </div>
           </section>
         </aside>
