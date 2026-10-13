@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { Project } from './types';
 import { connectedSelection, heightValues } from './model';
 import {
@@ -8,7 +8,7 @@ import {
   type SelectionOperation,
 } from './selection';
 import { loadImage } from './image';
-import { isEditingTarget, screenToImage } from './editor/viewport';
+import { fitScale, isEditingTarget, screenToImage, zoomAt, type CanvasCamera } from './editor/viewport';
 
 export type Tool =
   | 'color'
@@ -19,7 +19,10 @@ export type Tool =
   | 'smart'
   | 'lasso'
   | 'rectangle';
+export interface CanvasNavigation { fit(): void; actual(): void; zoom(factor: number): void }
 interface Props {
+  navigation: React.RefObject<CanvasNavigation | null>;
+  onZoomChange(scale: number): void;
   disabled?: boolean;
   simple?: boolean;
   snapEdges?: boolean;
@@ -33,7 +36,6 @@ interface Props {
   radius: number;
   mode: 'color' | 'regions' | 'layer';
   layer: number;
-  zoom: number;
   operation: SelectionOperation;
   selection: number[];
   onSelect(id: number): void;
@@ -43,7 +45,7 @@ interface Props {
 }
 
 export function EditorCanvas(props: Props) {
-  const { project, selected, tool, radius, mode, layer, zoom, operation, selection } = props;
+  const { project, selected, tool, radius, mode, layer, operation, selection } = props;
   const viewport = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
@@ -70,27 +72,59 @@ export function EditorCanvas(props: Props) {
   const spaceHeld = useRef(false);
   const [temporaryPan, setTemporaryPan] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [fit, setFit] = useState(1);
+  const [camera, setCamera] = useState<CanvasCamera>({ scale: 1, x: 0, y: 0 });
+  const cameraRef = useRef(camera);
+  const fitting = useRef(true);
   const [cursor, setCursor] = useState<[number, number] | null>(null);
   const selectionMask = useMemo(() => new Set(selection), [selection]);
-  const scale = fit * zoom;
+  const scale = camera.scale;
+  function moveCamera(next: CanvasCamera) {
+    cameraRef.current = next;
+    setCamera(next);
+    latest.current.onZoomChange(next.scale);
+  }
+  function fitCanvas() {
+    const host = viewport.current;
+    if (!host || !host.clientWidth || !host.clientHeight) return;
+    fitting.current = true;
+    moveCamera({ scale: fitScale(host.clientWidth, host.clientHeight, project.width, project.height), x: 0, y: 0 });
+  }
+  function changeZoom(next: number, x = 0, y = 0) {
+    if (props.disabled || stroke.current || outline.current || pan.current) return;
+    fitting.current = false;
+    moveCamera(zoomAt(cameraRef.current, next, x, y));
+  }
+  useImperativeHandle(props.navigation, () => ({
+    fit: fitCanvas,
+    actual: () => changeZoom(1),
+    zoom: factor => changeZoom(cameraRef.current.scale * factor),
+  }));
   useEffect(() => {
-    const host = viewport.current!;
-    const observer = new ResizeObserver(() =>
-      setFit(
-        Math.max(
-          0.05,
-          Math.min(
-            (host.clientWidth - 80) / project.width,
-            (host.clientHeight - 80) / project.height,
-            2,
-          ),
-        ),
-      ),
-    );
-    observer.observe(host);
+    fitCanvas();
+    const observer = new ResizeObserver(() => { if (fitting.current) fitCanvas(); });
+    observer.observe(viewport.current!);
     return () => observer.disconnect();
   }, [project.width, project.height]);
+  useEffect(() => {
+    const host = viewport.current!;
+    const wheel = (event: WheelEvent) => {
+      if (props.disabled) return;
+      event.preventDefault();
+      if (stroke.current || outline.current || pan.current) return;
+      if (event.shiftKey && !event.ctrlKey && !event.metaKey) {
+        fitting.current = false;
+        const delta = event.deltaMode === 1 ? 16 : 1;
+        moveCamera({ ...cameraRef.current, x: cameraRef.current.x - (event.deltaX || event.deltaY) * delta });
+        return;
+      }
+      const box = host.getBoundingClientRect();
+      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+      changeZoom(cameraRef.current.scale * Math.exp(-Math.max(-100, Math.min(100, delta)) * 0.002),
+        event.clientX - box.left - box.width / 2, event.clientY - box.top - box.height / 2);
+    };
+    host.addEventListener('wheel', wheel, { passive: false });
+    return () => host.removeEventListener('wheel', wheel);
+  });
   useEffect(() => {
     const instance = new Worker(new URL('./selection.worker.ts', import.meta.url), {
       type: 'module',
@@ -360,6 +394,13 @@ export function EditorCanvas(props: Props) {
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
       if (props.disabled || event.isComposing || isEditingTarget(event.target)) return;
+      if ((event.ctrlKey || event.metaKey) && ['0', '1', '+', '=', '-'].includes(event.key)) {
+        event.preventDefault();
+        if (stroke.current || outline.current || pan.current) return;
+        if (event.key === '0') fitCanvas();
+        else if (event.key === '1') changeZoom(1);
+        else changeZoom(cameraRef.current.scale * (event.key === '-' ? 0.8 : 1.25));
+      }
       if (event.code === 'Space' && !event.ctrlKey && !event.metaKey && !event.altKey) {
         if (!hovered.current || stroke.current || outline.current) return;
         event.preventDefault();
@@ -408,8 +449,28 @@ export function EditorCanvas(props: Props) {
   }, [props.disabled]);
   return (
     <div
-      className="canvas-viewport"
+      className={`canvas-viewport${temporaryPan || tool === 'hand' ? ' is-panning' : ''}`}
       ref={viewport}
+      data-scale={scale}
+      onPointerDownCapture={(event) => {
+        if (props.disabled || (event.button !== 0 && event.button !== 1)) return;
+        if (tool !== 'hand' && !spaceHeld.current && event.button !== 1) return;
+        if (stroke.current || outline.current) finish(true);
+        fitting.current = false;
+        pan.current = { x: event.clientX, y: event.clientY, left: cameraRef.current.x, top: cameraRef.current.y };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onPointerMove={(event) => {
+        if (!pan.current) return;
+        moveCamera({ ...cameraRef.current,
+          x: pan.current.left + event.clientX - pan.current.x,
+          y: pan.current.top + event.clientY - pan.current.y });
+      }}
+      onPointerUp={() => { pan.current = null; }}
+      onPointerCancel={() => finish(true)}
+      onLostPointerCapture={() => { pan.current = null; }}
       onPointerEnter={() => {
         hovered.current = true;
       }}
@@ -419,11 +480,11 @@ export function EditorCanvas(props: Props) {
     >
       <div
         className="canvas-scroll-area"
-        style={{ minWidth: project.width * scale + 80, minHeight: project.height * scale + 80 }}
       >
         <div
           className={`raster-frame checker tool-${temporaryPan ? 'hand' : tool}`}
-          style={{ width: project.width * scale, height: project.height * scale }}
+          style={{ width: project.width * scale, height: project.height * scale,
+            left: `calc(50% + ${camera.x}px)`, top: `calc(50% + ${camera.y}px)` }}
         >
           <canvas
             className="art-canvas"
@@ -437,17 +498,6 @@ export function EditorCanvas(props: Props) {
               if (props.disabled || !rgba.current || (event.button !== 0 && event.button !== 1))
                 return;
               const p = point(event);
-              if (tool === 'hand' || spaceHeld.current || event.button === 1) {
-                pan.current = {
-                  x: event.clientX,
-                  y: event.clientY,
-                  left: viewport.current!.scrollLeft,
-                  top: viewport.current!.scrollTop,
-                };
-                event.currentTarget.setPointerCapture(event.pointerId);
-                event.preventDefault();
-                return;
-              }
               if (tool === 'smart') {
                 const op = event.altKey ? 'subtract' : event.shiftKey ? 'add' : operation;
                 smartSeed.current = { point: p, baseline: selection, operation: op };
@@ -484,10 +534,7 @@ export function EditorCanvas(props: Props) {
             }}
             onPointerMove={(event) => {
               setCursor(point(event));
-              if (pan.current) {
-                viewport.current!.scrollLeft = pan.current.left - (event.clientX - pan.current.x);
-                viewport.current!.scrollTop = pan.current.top - (event.clientY - pan.current.y);
-              } else if (outline.current) {
+              if (outline.current) {
                 appendOutline(point(event));
                 renderOverlay(project.labels);
                 const ctx = overlay.current!.getContext('2d')!;

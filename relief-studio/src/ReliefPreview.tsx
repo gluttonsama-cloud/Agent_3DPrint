@@ -22,6 +22,7 @@ export function ReliefPreview({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const rememberedCamera = useRef<PreviewCamera | null>(null);
+  const resetCamera = useRef<(() => void) | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
     const host = container.current!;
@@ -68,6 +69,12 @@ export function ReliefPreview({
     controls.minDistance = 35;
     controls.maxDistance = 250;
     controls.maxPolarAngle = Math.PI * 0.49;
+    resetCamera.current = () => {
+      camera.position.set(65, 90, 112);
+      controls.target.set(0, 0, 0);
+      controls.update();
+      rememberCamera();
+    };
     const heights = data.heights;
     const w = data.width,
       h = data.height;
@@ -259,6 +266,7 @@ export function ReliefPreview({
       renderer.render(scene, camera);
     });
     return () => {
+      resetCamera.current = null;
       resize.disconnect();
       rememberCamera();
       controls.removeEventListener('change', rememberCamera);
@@ -284,6 +292,7 @@ export function ReliefPreview({
   return (
     <div className="preview-wrap">
       <div className="preview-host" ref={container} />
+      {!error && <button className="preview-reset" onClick={() => resetCamera.current?.()}>复位视角</button>}
       <span className="preview-hint">{error || '拖动旋转 · 滚轮缩放 · 零层无厚度，高度为示意'}</span>
     </div>
   );
