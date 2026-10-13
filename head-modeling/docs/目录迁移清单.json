@@ -1,0 +1,726 @@
+[
+  {
+    "from": "ai-3d-head-modeler",
+    "to": "head-modeling/apps/ai-3d-head-modeler"
+  },
+  {
+    "from": "backend",
+    "to": "head-modeling/services/backend"
+  },
+  {
+    "from": "local-gpu-service",
+    "to": "head-modeling/services/local-gpu-service"
+  },
+  {
+    "from": "admin-web",
+    "to": "head-modeling/archive/停用功能/admin-web"
+  },
+  {
+    "from": "scripts",
+    "to": "head-modeling/archive/历史工程/scripts"
+  },
+  {
+    "from": "nginx",
+    "to": "head-modeling/archive/历史工程/nginx"
+  },
+  {
+    "from": "docker-compose.yml",
+    "to": "head-modeling/archive/历史工程/docker-compose.yml"
+  },
+  {
+    "from": "Dockerfile",
+    "to": "head-modeling/archive/历史工程/Dockerfile"
+  },
+  {
+    "from": ".dockerignore",
+    "to": "head-modeling/archive/历史工程/.dockerignore"
+  },
+  {
+    "from": "jest.config.js",
+    "to": "head-modeling/archive/历史工程/jest.config.js"
+  },
+  {
+    "from": "playwright.config.ts",
+    "to": "head-modeling/archive/历史工程/playwright.config.ts"
+  },
+  {
+    "from": "playwright",
+    "to": "head-modeling/archive/历史工程/playwright"
+  },
+  {
+    "from": "plan.md",
+    "to": "head-modeling/archive/历史工程/plan.md"
+  },
+  {
+    "from": "package.json",
+    "to": "head-modeling/archive/历史工程/package.json"
+  },
+  {
+    "from": "package-lock.json",
+    "to": "head-modeling/archive/历史工程/package-lock.json"
+  },
+  {
+    "from": "node_modules",
+    "to": "head-modeling/archive/历史工程/node_modules"
+  },
+  {
+    "from": "backups",
+    "to": "head-modeling/archive/历史工程/backups"
+  },
+  {
+    "from": "docs/3D 模型加载失败 - 故障排查指南.md",
+    "to": "head-modeling/archive/历史文档/3D 模型加载失败 - 故障排查指南.md"
+  },
+  {
+    "from": "docs/3D 模型加载问题已修复.md",
+    "to": "head-modeling/archive/历史文档/3D 模型加载问题已修复.md"
+  },
+  {
+    "from": "docs/3D 模型展示指南.md",
+    "to": "head-modeling/archive/历史文档/3D 模型展示指南.md"
+  },
+  {
+    "from": "docs/admin-web 3分钟答辩提纲.md",
+    "to": "head-modeling/archive/演示与答辩/admin-web 3分钟答辩提纲.md"
+  },
+  {
+    "from": "docs/admin-web 比赛型项目总结文档.md",
+    "to": "head-modeling/archive/演示与答辩/admin-web 比赛型项目总结文档.md"
+  },
+  {
+    "from": "docs/admin-web 评委提问与参考回答 30 题.md",
+    "to": "head-modeling/archive/演示与答辩/admin-web 评委提问与参考回答 30 题.md"
+  },
+  {
+    "from": "docs/AI 抠图 API 价格调研报告.md",
+    "to": "head-modeling/archive/历史文档/AI 抠图 API 价格调研报告.md"
+  },
+  {
+    "from": "docs/AI_3D_HEAD_MODELER_APK_INFO.md",
+    "to": "head-modeling/archive/演示与答辩/AI_3D_HEAD_MODELER_APK_INFO.md"
+  },
+  {
+    "from": "docs/CONTRIBUTING.md",
+    "to": "head-modeling/archive/历史文档/CONTRIBUTING.md"
+  },
+  {
+    "from": "docs/DATABASE_SETUP.md",
+    "to": "head-modeling/archive/历史文档/DATABASE_SETUP.md"
+  },
+  {
+    "from": "docs/DECISIONS.md",
+    "to": "head-modeling/archive/历史文档/DECISIONS.md"
+  },
+  {
+    "from": "docs/DEPLOYMENT_GUIDE.md",
+    "to": "head-modeling/archive/历史文档/DEPLOYMENT_GUIDE.md"
+  },
+  {
+    "from": "docs/evidence",
+    "to": "head-modeling/archive/历史文档/evidence"
+  },
+  {
+    "from": "docs/LangChain 技术方案决策.md",
+    "to": "head-modeling/archive/历史文档/LangChain 技术方案决策.md"
+  },
+  {
+    "from": "docs/LLM 集成测试总结.md",
+    "to": "head-modeling/archive/历史文档/LLM 集成测试总结.md"
+  },
+  {
+    "from": "docs/LOCAL-GPU-DEPLOY.md",
+    "to": "head-modeling/archive/历史文档/LOCAL-GPU-DEPLOY.md"
+  },
+  {
+    "from": "docs/LOCAL-GPU-FINAL-GUIDE.md",
+    "to": "head-modeling/archive/历史文档/LOCAL-GPU-FINAL-GUIDE.md"
+  },
+  {
+    "from": "docs/PRINTER_INTEGRATION_GUIDE.md",
+    "to": "head-modeling/archive/历史文档/PRINTER_INTEGRATION_GUIDE.md"
+  },
+  {
+    "from": "docs/QUICK_START_WINDOWS.md",
+    "to": "head-modeling/archive/历史文档/QUICK_START_WINDOWS.md"
+  },
+  {
+    "from": "docs/README_DATABASE.md",
+    "to": "head-modeling/archive/历史文档/README_DATABASE.md"
+  },
+  {
+    "from": "docs/TESTING_PROCEDURE.md",
+    "to": "head-modeling/archive/历史文档/TESTING_PROCEDURE.md"
+  },
+  {
+    "from": "docs/临时更改记录.md",
+    "to": "head-modeling/archive/历史文档/临时更改记录.md"
+  },
+  {
+    "from": "docs/前端 LLM 工作流程展示 - 使用指南.md",
+    "to": "head-modeling/archive/历史文档/前端 LLM 工作流程展示 - 使用指南.md"
+  },
+  {
+    "from": "docs/前端 LLM 工作流程展示优化方案.md",
+    "to": "head-modeling/archive/历史文档/前端 LLM 工作流程展示优化方案.md"
+  },
+  {
+    "from": "docs/前端 LLM 工作流程测试报告.md",
+    "to": "head-modeling/archive/历史文档/前端 LLM 工作流程测试报告.md"
+  },
+  {
+    "from": "docs/前端项目评估报告.md",
+    "to": "head-modeling/archive/历史文档/前端项目评估报告.md"
+  },
+  {
+    "from": "docs/图像预处理方案调研.md",
+    "to": "head-modeling/archive/历史文档/图像预处理方案调研.md"
+  },
+  {
+    "from": "docs/技术难点与未来方向.md",
+    "to": "head-modeling/archive/历史文档/技术难点与未来方向.md"
+  },
+  {
+    "from": "docs/本地 GPU 背景抠图部署方案.md",
+    "to": "head-modeling/archive/历史文档/本地 GPU 背景抠图部署方案.md"
+  },
+  {
+    "from": "docs/演示流程脚本.md",
+    "to": "head-modeling/archive/演示与答辩/演示流程脚本.md"
+  },
+  {
+    "from": "docs/整理执行进度.md",
+    "to": "head-modeling/docs/重构进度.md"
+  },
+  {
+    "from": "head-modeling/apps/ai-3d-head-modeler/src/pages/Order.tsx",
+    "to": "head-modeling/archive/停用功能/user-app/src/pages/Order.tsx"
+  },
+  {
+    "from": "head-modeling/apps/ai-3d-head-modeler/src/pages/PaymentResult.tsx",
+    "to": "head-modeling/archive/停用功能/user-app/src/pages/PaymentResult.tsx"
+  },
+  {
+    "from": "head-modeling/apps/ai-3d-head-modeler/src/pages/OrderHistory.jsx",
+    "to": "head-modeling/archive/停用功能/user-app/src/pages/OrderHistory.jsx"
+  },
+  {
+    "from": "head-modeling/apps/ai-3d-head-modeler/src/pages/OrderStatus.jsx",
+    "to": "head-modeling/archive/停用功能/user-app/src/pages/OrderStatus.jsx"
+  },
+  {
+    "from": "head-modeling/apps/ai-3d-head-modeler/src/components",
+    "to": "head-modeling/archive/停用功能/user-app/src/components"
+  },
+  {
+    "from": "head-modeling/apps/ai-3d-head-modeler/src/services/orderService.ts",
+    "to": "head-modeling/archive/停用功能/user-app/src/services/orderService.ts"
+  },
+  {
+    "from": "head-modeling/apps/ai-3d-head-modeler/src/services/paymentService.ts",
+    "to": "head-modeling/archive/停用功能/user-app/src/services/paymentService.ts"
+  },
+  {
+    "from": "head-modeling/apps/ai-3d-head-modeler/src/utils/socket.js",
+    "to": "head-modeling/archive/停用功能/user-app/src/utils/socket.js"
+  },
+  {
+    "from": "head-modeling/apps/ai-3d-head-modeler/src/utils/priceCalculator.ts",
+    "to": "head-modeling/archive/停用功能/user-app/src/utils/priceCalculator.ts"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/algorithms/DeviceAllocationAlgorithm.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/algorithms/DeviceAllocationAlgorithm.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/algorithms/InventoryForecastAlgorithm.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/algorithms/InventoryForecastAlgorithm.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/BaseAgent.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/BaseAgent.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/communication/AgentMessenger.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/communication/AgentMessenger.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/communication/MessageQueue.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/communication/MessageQueue.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/communication/Protocol.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/communication/Protocol.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/communication/RequestResponseHandler.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/communication/RequestResponseHandler.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/communication/TimeoutRetryManager.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/communication/TimeoutRetryManager.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/CoordinatorAgent.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/CoordinatorAgent.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/DecisionEngine.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/DecisionEngine.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/InventoryAgent.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/InventoryAgent.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/registry.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/registry.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/rules/inventoryRules.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/rules/inventoryRules.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/rules/orderRules.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/rules/orderRules.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/rules/schedulingRules.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/rules/schedulingRules.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/SchedulerAgent.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/SchedulerAgent.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/tools/deviceTools.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/tools/deviceTools.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/tools/index.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/tools/index.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/tools/materialTools.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/tools/materialTools.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/agents/tools/orderTools.js",
+    "to": "head-modeling/archive/停用功能/backend/src/agents/tools/orderTools.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/app.fixed.js",
+    "to": "head-modeling/archive/停用功能/backend/src/app.fixed.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/app.js",
+    "to": "head-modeling/archive/停用功能/backend/src/app.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/app.llm.js",
+    "to": "head-modeling/archive/停用功能/backend/src/app.llm.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/app.real.js",
+    "to": "head-modeling/archive/停用功能/backend/src/app.real.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/app.server.js",
+    "to": "head-modeling/archive/停用功能/backend/src/app.server.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/config/llm.js",
+    "to": "head-modeling/archive/停用功能/backend/src/config/llm.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/config/qiniuLLM.js",
+    "to": "head-modeling/archive/停用功能/backend/src/config/qiniuLLM.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/config/redis.js",
+    "to": "head-modeling/archive/停用功能/backend/src/config/redis.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/config/redis.mock.js",
+    "to": "head-modeling/archive/停用功能/backend/src/config/redis.mock.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/constants/orderStates.js",
+    "to": "head-modeling/archive/停用功能/backend/src/constants/orderStates.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/db/connect.js",
+    "to": "head-modeling/archive/停用功能/backend/src/db/connect.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/db/connect.mock.js",
+    "to": "head-modeling/archive/停用功能/backend/src/db/connect.mock.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/db/mongoose.js",
+    "to": "head-modeling/archive/停用功能/backend/src/db/mongoose.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/db/mongoose.mock.js",
+    "to": "head-modeling/archive/停用功能/backend/src/db/mongoose.mock.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/models/AgentDecision.js",
+    "to": "head-modeling/archive/停用功能/backend/src/models/AgentDecision.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/models/Device.js",
+    "to": "head-modeling/archive/停用功能/backend/src/models/Device.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/models/index.js",
+    "to": "head-modeling/archive/停用功能/backend/src/models/index.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/models/Material.js",
+    "to": "head-modeling/archive/停用功能/backend/src/models/Material.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/models/Order.js",
+    "to": "head-modeling/archive/停用功能/backend/src/models/Order.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/queues/agentQueue.js",
+    "to": "head-modeling/archive/停用功能/backend/src/queues/agentQueue.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/queues/index.js",
+    "to": "head-modeling/archive/停用功能/backend/src/queues/index.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/queues/notificationQueue.js",
+    "to": "head-modeling/archive/停用功能/backend/src/queues/notificationQueue.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/queues/orderQueue.js",
+    "to": "head-modeling/archive/停用功能/backend/src/queues/orderQueue.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/agentDecisions.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/agentDecisions.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/agents.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/agents.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/agentWorkflow.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/agentWorkflow.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/dashboard.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/dashboard.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/dashboard.test.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/dashboard.test.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/decisionLogs.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/decisionLogs.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/devices.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/devices.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/materials.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/materials.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/orders.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/orders.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/performance.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/performance.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/routes/simpleDecision.js",
+    "to": "head-modeling/archive/停用功能/backend/src/routes/simpleDecision.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/services/AgentDecisionService.js",
+    "to": "head-modeling/archive/停用功能/backend/src/services/AgentDecisionService.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/services/cacheService.js",
+    "to": "head-modeling/archive/停用功能/backend/src/services/cacheService.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/services/DashboardService.js",
+    "to": "head-modeling/archive/停用功能/backend/src/services/DashboardService.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/services/DecisionLogService.js",
+    "to": "head-modeling/archive/停用功能/backend/src/services/DecisionLogService.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/services/DeviceService.js",
+    "to": "head-modeling/archive/停用功能/backend/src/services/DeviceService.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/services/MaterialService.js",
+    "to": "head-modeling/archive/停用功能/backend/src/services/MaterialService.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/services/OrderService.js",
+    "to": "head-modeling/archive/停用功能/backend/src/services/OrderService.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/services/rateLimiterService.js",
+    "to": "head-modeling/archive/停用功能/backend/src/services/rateLimiterService.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/services/tokenOptimizerService.js",
+    "to": "head-modeling/archive/停用功能/backend/src/services/tokenOptimizerService.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/states/hooks.js",
+    "to": "head-modeling/archive/停用功能/backend/src/states/hooks.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/states/OrderStateMachine.js",
+    "to": "head-modeling/archive/停用功能/backend/src/states/OrderStateMachine.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/states/transitions.js",
+    "to": "head-modeling/archive/停用功能/backend/src/states/transitions.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/utils/AgentEventEmitter.js",
+    "to": "head-modeling/archive/停用功能/backend/src/utils/AgentEventEmitter.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/utils/consumptionCalculator.js",
+    "to": "head-modeling/archive/停用功能/backend/src/utils/consumptionCalculator.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/utils/DecisionAnalyzer.js",
+    "to": "head-modeling/archive/停用功能/backend/src/utils/DecisionAnalyzer.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/utils/loadCalculator.js",
+    "to": "head-modeling/archive/停用功能/backend/src/utils/loadCalculator.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/utils/MockBull.js",
+    "to": "head-modeling/archive/停用功能/backend/src/utils/MockBull.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/workers/agentWorker.js",
+    "to": "head-modeling/archive/停用功能/backend/src/workers/agentWorker.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/workers/notificationWorker.js",
+    "to": "head-modeling/archive/停用功能/backend/src/workers/notificationWorker.js"
+  },
+  {
+    "from": "head-modeling/services/backend/src/workers/orderWorker.js",
+    "to": "head-modeling/archive/停用功能/backend/src/workers/orderWorker.js"
+  },
+  {
+    "from": "head-modeling/services/backend/backend-update.tar.gz",
+    "to": "head-modeling/archive/停用功能/backend/backend-update.tar.gz"
+  },
+  {
+    "from": "head-modeling/services/backend/backend.log",
+    "to": "head-modeling/archive/停用功能/backend/backend.log"
+  },
+  {
+    "from": "head-modeling/services/backend/coverage",
+    "to": "head-modeling/archive/停用功能/backend/coverage"
+  },
+  {
+    "from": "head-modeling/services/backend/deploy.sh",
+    "to": "head-modeling/archive/停用功能/backend/deploy.sh"
+  },
+  {
+    "from": "head-modeling/services/backend/docs",
+    "to": "head-modeling/archive/停用功能/backend/docs"
+  },
+  {
+    "from": "head-modeling/services/backend/jest.config.js",
+    "to": "head-modeling/archive/停用功能/backend/jest.config.js"
+  },
+  {
+    "from": "head-modeling/services/backend/MOCK-QUICK-START.md",
+    "to": "head-modeling/archive/停用功能/backend/MOCK-QUICK-START.md"
+  },
+  {
+    "from": "head-modeling/services/backend/nginx.conf.example",
+    "to": "head-modeling/archive/停用功能/backend/nginx.conf.example"
+  },
+  {
+    "from": "head-modeling/services/backend/scripts",
+    "to": "head-modeling/archive/停用功能/backend/scripts"
+  },
+  {
+    "from": "head-modeling/services/backend/services",
+    "to": "head-modeling/archive/停用功能/backend/services"
+  },
+  {
+    "from": "head-modeling/services/backend/start-dev-mock.bat",
+    "to": "head-modeling/archive/停用功能/backend/start-dev-mock.bat"
+  },
+  {
+    "from": "head-modeling/services/backend/start-mock.bat",
+    "to": "head-modeling/archive/停用功能/backend/start-mock.bat"
+  },
+  {
+    "from": "head-modeling/services/backend/start-with-agents.js",
+    "to": "head-modeling/archive/停用功能/backend/start-with-agents.js"
+  },
+  {
+    "from": "head-modeling/services/backend/test-agent-scenarios.js",
+    "to": "head-modeling/archive/停用功能/backend/test-agent-scenarios.js"
+  },
+  {
+    "from": "head-modeling/services/backend/test-decision-engine-llm.js",
+    "to": "head-modeling/archive/停用功能/backend/test-decision-engine-llm.js"
+  },
+  {
+    "from": "head-modeling/services/backend/test-qiniu-llm.js",
+    "to": "head-modeling/archive/停用功能/backend/test-qiniu-llm.js"
+  },
+  {
+    "from": "head-modeling/services/backend/test-real-decision.js",
+    "to": "head-modeling/archive/停用功能/backend/test-real-decision.js"
+  },
+  {
+    "from": "head-modeling/services/backend/test-results",
+    "to": "head-modeling/archive/停用功能/backend/test-results"
+  },
+  {
+    "from": "head-modeling/services/backend/test-state-machine.js",
+    "to": "head-modeling/archive/停用功能/backend/test-state-machine.js"
+  },
+  {
+    "from": "head-modeling/services/backend/tests",
+    "to": "head-modeling/archive/停用功能/backend/tests"
+  },
+  {
+    "from": "head-modeling/archive/停用功能/admin-web/admin-dist.tar.gz",
+    "to": "head-modeling/archive/构建备份/admin-web/admin-dist.tar.gz"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/backups",
+    "to": "head-modeling/archive/GPU旧资料/backups"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/cloudflare-tunnel.bat",
+    "to": "head-modeling/archive/GPU旧资料/cloudflare-tunnel.bat"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/cloudflare-tunnel.sh",
+    "to": "head-modeling/archive/GPU旧资料/cloudflare-tunnel.sh"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/deploy-multi-model.bat",
+    "to": "head-modeling/archive/GPU旧资料/deploy-multi-model.bat"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/deploy-multi-model.sh",
+    "to": "head-modeling/archive/GPU旧资料/deploy-multi-model.sh"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/deploy.bat",
+    "to": "head-modeling/archive/GPU旧资料/deploy.bat"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/deploy.sh",
+    "to": "head-modeling/archive/GPU旧资料/deploy.sh"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/DEPLOYMENT-SUCCESS.md",
+    "to": "head-modeling/archive/GPU旧资料/DEPLOYMENT-SUCCESS.md"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/docker-compose.yml",
+    "to": "head-modeling/archive/GPU旧资料/docker-compose.yml"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/docs",
+    "to": "head-modeling/archive/GPU旧资料/docs"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/install-cuda.bat",
+    "to": "head-modeling/archive/GPU旧资料/install-cuda.bat"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/MULTI-MODEL-GUIDE.md",
+    "to": "head-modeling/archive/GPU旧资料/MULTI-MODEL-GUIDE.md"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/output.png",
+    "to": "head-modeling/archive/GPU旧资料/output.png"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/QUICK-START.md",
+    "to": "head-modeling/archive/GPU旧资料/QUICK-START.md"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/README-PORTRAIT.md",
+    "to": "head-modeling/archive/GPU旧资料/README-PORTRAIT.md"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/README.md",
+    "to": "head-modeling/archive/GPU旧资料/README.md"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/scripts",
+    "to": "head-modeling/archive/GPU旧资料/scripts"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/start-all-simple.bat",
+    "to": "head-modeling/archive/GPU旧资料/start-all-simple.bat"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/start-all.bat",
+    "to": "head-modeling/archive/GPU旧资料/start-all.bat"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/start-all.sh",
+    "to": "head-modeling/archive/GPU旧资料/start-all.sh"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/START-GUIDE.md",
+    "to": "head-modeling/archive/GPU旧资料/START-GUIDE.md"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/start-tunnel.bat",
+    "to": "head-modeling/archive/GPU旧资料/start-tunnel.bat"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/stop-all-simple.bat",
+    "to": "head-modeling/archive/GPU旧资料/stop-all-simple.bat"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/stop-all.bat",
+    "to": "head-modeling/archive/GPU旧资料/stop-all.bat"
+  },
+  {
+    "from": "head-modeling/services/local-gpu-service/start_server.py",
+    "to": "head-modeling/archive/GPU旧资料/start_server.py"
+  },
+  {
+    "from": ".env",
+    "to": "head-modeling/archive/历史工程/.env"
+  },
+  {
+    "from": ".env.example",
+    "to": "head-modeling/archive/历史工程/.env.example"
+  },
+  {
+    "from": "openspec",
+    "to": "head-modeling/archive/历史工程/openspec"
+  },
+  {
+    "from": ".sisyphus",
+    "to": "head-modeling/archive/历史工程/.sisyphus"
+  }
+]

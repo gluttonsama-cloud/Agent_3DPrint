@@ -1,0 +1,22 @@
+{
+  "name": "rembg-portrait-service",
+  "description": "本地 GPU 背景抠图服务 - 人像专用模型",
+  "version": "1.0.0",
+  "author": "3D Head Modeling Team",
+  "scripts": {
+    "start": "rembg s --port 7000 --host 0.0.0.0",
+    "start-portrait": "rembg s --port 7000 --host 0.0.0.0",
+    "tunnel": "cloudflared tunnel --url http://localhost:7000",
+    "start-all": "start-all.bat",
+    "stop-all": "stop-all.bat",
+    "test": "python test-portrait.py"
+  },
+  "keywords": [
+    "background-removal",
+    "ai",
+    "gpu",
+    "portrait",
+    "segmentation"
+  ],
+  "license": "MIT"
+}

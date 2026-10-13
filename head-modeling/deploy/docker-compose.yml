@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ../services/backend
+    env_file:
+      - ../services/backend/.env
+    environment:
+      PORT: 3001
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:3001:3001"
+    restart: unless-stopped
+  user-web:
+    build:
+      context: ../apps/ai-3d-head-modeler
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+  rembg:
+    profiles: [gpu]
+    build:
+      context: ../services/local-gpu-service
+    ports:
+      - "127.0.0.1:7000:7000"
+    restart: unless-stopped

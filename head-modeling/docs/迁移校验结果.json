@@ -1,0 +1,87 @@
+{
+  "baseline_files": 814,
+  "relief_unchanged_files": 153,
+  "modified_with_original_preserved": [
+    {
+      "from": "docs/仓库整理与功能盘点.md",
+      "current": "docs/仓库整理与功能盘点.md",
+      "original": "head-modeling/archive/迁移前原件/docs/仓库整理与功能盘点.md"
+    },
+    {
+      "from": ".gitignore",
+      "current": ".gitignore",
+      "original": "head-modeling/archive/迁移前原件/.gitignore"
+    },
+    {
+      "from": "AGENTS.md",
+      "current": "AGENTS.md",
+      "original": "head-modeling/archive/迁移前原件/AGENTS.md"
+    },
+    {
+      "from": "README.md",
+      "current": "README.md",
+      "original": "head-modeling/archive/迁移前原件/README.md"
+    },
+    {
+      "from": "ai-3d-head-modeler/.env.example",
+      "current": "head-modeling/apps/ai-3d-head-modeler/.env.example",
+      "original": "head-modeling/archive/迁移前原件/ai-3d-head-modeler/.env.example"
+    },
+    {
+      "from": "ai-3d-head-modeler/src/App.tsx",
+      "current": "head-modeling/apps/ai-3d-head-modeler/src/App.tsx",
+      "original": "head-modeling/archive/迁移前原件/head-modeling/apps/ai-3d-head-modeler/src/App.tsx"
+    },
+    {
+      "from": "ai-3d-head-modeler/src/pages/Preview.tsx",
+      "current": "head-modeling/apps/ai-3d-head-modeler/src/pages/Preview.tsx",
+      "original": "head-modeling/archive/迁移前原件/head-modeling/apps/ai-3d-head-modeler/src/pages/Preview.tsx"
+    },
+    {
+      "from": "ai-3d-head-modeler/src/services/animeFilterService.ts",
+      "current": "head-modeling/apps/ai-3d-head-modeler/src/services/animeFilterService.ts",
+      "original": "head-modeling/archive/迁移前原件/ai-3d-head-modeler/src/services/animeFilterService.ts"
+    },
+    {
+      "from": "ai-3d-head-modeler/src/services/uploadService.ts",
+      "current": "head-modeling/apps/ai-3d-head-modeler/src/services/uploadService.ts",
+      "original": "head-modeling/archive/迁移前原件/ai-3d-head-modeler/src/services/uploadService.ts"
+    },
+    {
+      "from": "backend/Dockerfile",
+      "current": "head-modeling/services/backend/Dockerfile",
+      "original": "head-modeling/archive/迁移前原件/backend/Dockerfile"
+    },
+    {
+      "from": "backend/README.md",
+      "current": "head-modeling/services/backend/README.md",
+      "original": "head-modeling/archive/迁移前原件/backend/README.md"
+    },
+    {
+      "from": "backend/package.json",
+      "current": "head-modeling/services/backend/package.json",
+      "original": "head-modeling/archive/迁移前原件/backend/package.json"
+    },
+    {
+      "from": "backend/src/config/swagger.js",
+      "current": "head-modeling/services/backend/src/config/swagger.js",
+      "original": "head-modeling/archive/迁移前原件/backend/src/config/swagger.js"
+    },
+    {
+      "from": "local-gpu-service/Dockerfile",
+      "current": "head-modeling/services/local-gpu-service/Dockerfile",
+      "original": "head-modeling/archive/迁移前原件/local-gpu-service/Dockerfile"
+    },
+    {
+      "from": "local-gpu-service/package.json",
+      "current": "head-modeling/services/local-gpu-service/package.json",
+      "original": "head-modeling/archive/迁移前原件/local-gpu-service/package.json"
+    },
+    {
+      "from": "docs/整理执行进度.md",
+      "current": "head-modeling/docs/重构进度.md",
+      "original": "head-modeling/archive/迁移前原件/docs/整理执行进度.md"
+    }
+  ],
+  "missing_or_unpreserved": []
+}
