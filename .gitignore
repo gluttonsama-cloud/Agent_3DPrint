@@ -8,6 +8,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 package-lock.json
+!head-modeling/services/backend/package-lock.json
+!head-modeling/apps/ai-3d-head-modeler/package-lock.json
 
 # =====================================================
 # 环境变量（包含敏感信息）
@@ -18,6 +20,8 @@ package-lock.json
 .env.test
 .env.production
 .env.*.local
+.env.*
+!.env.example
 
 # =====================================================
 # 日志文件
@@ -159,9 +163,10 @@ DocumentRevisions-V100/
 # =====================================================
 .sisyphus/
 .ruff_cache/
+__pycache__/
+*.pyc
 nul
 .agents/
-.agent/
 .opencode/
 openspec/
 skills-lock.json
@@ -197,12 +202,16 @@ PLAYWRIGHT_TEST_REPORT.md
 # API 测试（包含密钥）
 api_test/
 
-# 历史部署打包与临时图片，不作为源码提交
+# 本地工具与历史构建产物
+.agent/
 *.tar.gz
-ai-3d-head-modeler/screenshot-*.png
-ai-3d-head-modeler/test-*.png
-local-gpu-service/output.png
+**/screenshot-*.png
+**/test-final-result.png
+**/test-result-screenshot.png
+
+.pytest_cache/
 backend/test-agent-scenarios.js
 backend/test-decision-engine-llm.js
 backend/test-qiniu-llm.js
 backend/test-real-decision.js
+local-gpu-service/output.png

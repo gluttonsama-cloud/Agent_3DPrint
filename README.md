@@ -26,3 +26,5 @@ Windows 浮雕制版工作台，用于 LOGO、文字和图案的主体识别、�
 ## 源码与开发
 
 源码位于 [relief-studio](relief-studio/)。开发环境、构建命令与验证记录见 [开发说明](relief-studio/README.md)。
+
+仓库按产品分目录：Relief Studio 独立保留在 relief-studio/；其他产品的应用、服务、部署和历史资料集中在 head-modeling/。根目录不再承担旧系统的 npm、Docker 或测试启动入口。
