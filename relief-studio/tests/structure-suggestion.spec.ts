@@ -33,6 +33,9 @@ test('真实徽标的歧义轮廓建议保持层高、颜色与历史不变', as
     expect(after.protection).toEqual(before.protection);
     await page.getByRole('button', { name: '3D 浮雕', exact: true }).click();
     await expect(page.locator('.preview-host canvas')).toBeVisible();
+    // 等待 Three.js 的首次绘制与下一帧合成，避免只截到背景。
+    await page.evaluate(() => new Promise<void>(resolve =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     await page.screenshot({ path: 'artifacts/workbench/structure-suggestion-fixed.png' });
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach(window => window.destroy()));
