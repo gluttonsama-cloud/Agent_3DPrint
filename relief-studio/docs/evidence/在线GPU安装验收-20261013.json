@@ -1,0 +1,36 @@
+{
+  "version": "0.4.2-d2.4",
+  "release": "https://github.com/gluttonsama-cloud/Agent_3DPrint/releases/tag/relief-studio-v0.4.2-d2.4",
+  "installation": {
+    "mode": "NSIS /S /GPU=1",
+    "appId": "com.reliefstudio.gpu-verification",
+    "usedOnlineAssets": true,
+    "localPartsBesideInstaller": 0,
+    "exitCode": 0,
+    "elapsedSeconds": 859.69,
+    "downloadBytes": 2611751546,
+    "verifiedRuntimeFiles": 5338,
+    "newTemporaryDirectoriesRemaining": 0,
+    "previousInterruptedDownloadsRemaining": 1
+  },
+  "cuda": {
+    "cudaAvailable": true,
+    "torch": "2.7.1+cu128",
+    "device": "NVIDIA GeForce RTX 5070 Laptop GPU",
+    "probe": 1.0
+  },
+  "packagedTests": {
+    "passed": 2,
+    "failed": 0,
+    "durationSeconds": 35.0,
+    "realGpu": "BiRefNet, SAM, v2 import/recognition, CPU height edit",
+    "colorPartition": "Fixed subject mask; real partition, height, save and reopen",
+    "externalPythonPathRemoved": true,
+    "gpuProcessesRemaining": 0
+  },
+  "limitations": [
+    "Other GPUs and missing-driver Windows Update installation were not tested.",
+    "Customer RIP and physical printing were not tested.",
+    "Automatic approval rejected cleanup of the previous interrupted download; its approximately 1.35 GB partial archive is retained."
+  ]
+}
