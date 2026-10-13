@@ -286,8 +286,6 @@ test('选区保持原色、追加减选、分配撤销与紧凑窗口', async ()
   try {
     await page.setViewportSize({ width: 1100, height: 720 });
     await page.getByRole('button', { name: '打开 55 mm 徽标示例' }).click();
-    await page.getByRole('button', { name: '更多工具', exact: true }).click();
-    await page.getByRole('button', { name: '同色选区', exact: true }).click();
     const art = page.getByLabel('图案编辑画布');
     await expect(art).toHaveAttribute('data-ready', 'true');
     const sample = JSON.parse(
@@ -309,17 +307,19 @@ test('选区保持原色、追加减选、分配撤销与紧凑窗口', async ()
       await expect(page.getByTestId('selection-count')).toHaveAttribute('data-count', '0');
       expect(await art.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(before);
     }
-    const clickPixel = async (index: number, modifiers?: ('Shift' | 'Alt')[]) => {
-      const box = (await art.boundingBox())!;
-      await art.click({
-        position: {
-          x: (((index % sample.width) + 0.5) * box.width) / sample.width,
-          y: ((Math.floor(index / sample.width) + 0.5) * box.height) / sample.height,
-        },
-        modifiers,
-      });
+    const selectPixelRegion = async (index: number, modifiers?: ('Shift' | 'Alt')[]) => {
+      const region = sample.regions.find((item: { id: number }) => item.id === sample.labels[index]);
+      await page.locator('.region-card').filter({ hasText: region.name }).click();
+      await page.getByRole('button', { name: '选择整个区域', exact: true }).click({ modifiers });
     };
-    await clickPixel(goldIndices[Math.floor(goldIndices.length / 2)]);
+    const clickPixel = async (index: number) => {
+      const box = (await art.boundingBox())!;
+      await art.click({ position: {
+        x: ((index % sample.width) + 0.5) * box.width / sample.width,
+        y: (Math.floor(index / sample.width) + 0.5) * box.height / sample.height,
+      } });
+    };
+    await selectPixelRegion(goldIndices[Math.floor(goldIndices.length / 2)]);
     await expect(page.getByTestId('selection-count')).toHaveAttribute(
       'data-count',
       String(goldIndices.length),
@@ -335,16 +335,19 @@ test('选区保持原色、追加减选、分配撤销与紧凑窗口', async ()
     expect(boundary).toBeGreaterThan(100);
     expect(boundary).toBeLessThan(goldIndices.length);
     await page.screenshot({ path: path.join(root, 'artifacts', 'selection-workbench.png') });
-    await clickPixel(whiteIndices[Math.floor(whiteIndices.length / 2)], ['Shift']);
+    await selectPixelRegion(whiteIndices[Math.floor(whiteIndices.length / 2)], ['Shift']);
     await expect(page.getByTestId('selection-count')).toHaveAttribute(
       'data-count',
       String(goldIndices.length + whiteIndices.length),
     );
-    await clickPixel(whiteIndices[Math.floor(whiteIndices.length / 2)], ['Alt']);
+    await selectPixelRegion(whiteIndices[Math.floor(whiteIndices.length / 2)], ['Alt']);
     await expect(page.getByTestId('selection-count')).toHaveAttribute(
       'data-count',
       String(goldIndices.length),
     );
+    // 新区域沿用当前区域属性；全选白字后明确切回金色再创建。
+    await page.locator('.region-card').filter({ hasText: sample.regions.find((item: { id: number }) => item.id === gold).name }).click();
+    await page.locator('.advanced-properties > summary').click();
     await page.getByRole('button', { name: '选区建立新区域' }).click();
     await expect(page.locator('.region-card')).toHaveCount(4);
     await expect(page.getByTestId('selection-count')).toHaveAttribute('data-count', '0');
@@ -368,7 +371,8 @@ test('选区保持原色、追加减选、分配撤销与紧凑窗口', async ()
     expect(layout.overflow).toBe(false);
     expect(layout.footer).toBeLessThan(layout.height);
     expect(layout.canvas).toBeGreaterThan(250);
-    await page.getByRole('button', { name: '画笔', exact: true }).click();
+    await page.getByRole('button', { name: '修补', exact: true }).click();
+    await page.getByLabel('修补方式').selectOption('brush');
     await page.getByLabel('绘入区域').selectOption(String(white));
     await clickPixel(goldIndices[Math.floor(goldIndices.length / 2)]);
     const savePath = path.join(root, 'artifacts', `selection-assignment-v2-${Date.now()}.relief.json`);
@@ -507,8 +511,8 @@ test('导入、圆形裁剪、分区、画笔擦除与撤销', async () => {
     await page.getByRole('button', { name: '应用识别结果', exact: true }).click();
     await expect(page.locator('.statusbar')).toContainText('分区已完成');
     await expect(page.locator('.region-card')).toHaveCount(3);
-    await page.getByRole('button', { name: '更多工具', exact: true }).click();
-    await page.getByRole('button', { name: '擦除', exact: true }).click();
+    await page.getByRole('button', { name: '修补', exact: true }).click();
+    await page.getByLabel('修补方式').selectOption('erase');
     const art = page.getByLabel('图案编辑画布');
     const artBox = (await art.boundingBox())!;
     await page.mouse.click(artBox.x + artBox.width / 2, artBox.y + artBox.height / 2);

@@ -467,6 +467,8 @@ export function EditorCanvas(props: Props) {
               if (tool === 'color' || tool === 'connected') {
                 const index = p[1] * project.width + p[0],
                   id = project.labels[index];
+                // 连通点选遵守画布范围，不隐式激活或追加其他区域。
+                if (tool === 'connected' && props.simple && id !== selected) return;
                 const next =
                   tool === 'color'
                     ? regionSelection(project.labels, id)

@@ -71,7 +71,7 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
     await expect(page.locator('.statusbar')).toContainText('工程已恢复');
     const canvas = page.getByLabel('图案编辑画布');
     await expect(canvas).toHaveAttribute('data-ready', 'true');
-    await expect(page.locator('.trim-panel button')).toHaveText(['清除', '保留']);
+    await expect(page.locator('.trim-panel button')).toHaveText(['清除', '只留选中部分']);
     await expect(page.getByLabel('区域层数', { exact: true })).not.toBeVisible();
     const box = (await canvas.boundingBox())!;
     const click = (x: number, y: number) =>
@@ -100,7 +100,7 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
     await page.getByRole('button', { name: '撤销', exact: true }).click();
     await click(20, 20);
     await expect(page.getByTestId('selection-count')).toHaveAttribute('data-count', '2100');
-    await page.getByRole('button', { name: '保留', exact: true }).click();
+    await page.getByRole('button', { name: '只留选中部分', exact: true }).click();
     const kept = await save();
     expect(
       kept.labels.every((id: number, i: number) =>
@@ -123,7 +123,8 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
     await expect(page.getByTestId('selection-count')).toHaveAttribute('data-count', '0');
-    await page.getByRole('button', { name: '圈选', exact: true }).click();
+    await page.getByRole('button', { name: '选区', exact: true }).click();
+    await page.getByLabel('选区形状').selectOption('lasso');
     await expect(page.getByRole('checkbox', { name: '自动贴边' })).toBeChecked();
     await page.mouse.move(box.x + box.width * 0.08, box.y + box.height * 0.08);
     await page.mouse.down();
@@ -189,7 +190,8 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
     await page.getByRole('button', { name: '打开工程', exact: true }).click();
     await expect(page.locator('.statusbar')).toContainText('工程已恢复');
     await expect(canvas).toHaveAttribute('data-ready', 'true');
-    await page.getByRole('button', { name: '框选', exact: true }).click();
+    await page.getByRole('button', { name: '选区', exact: true }).click();
+    await page.getByLabel('选区形状').selectOption('rectangle');
     const boundary = (await canvas.boundingBox())!;
     await page.mouse.move(boundary.x + 0.1, boundary.y + 0.1);
     await page.mouse.down();

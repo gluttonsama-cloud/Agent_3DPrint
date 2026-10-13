@@ -4,10 +4,12 @@ import { RecognitionDialog } from './RecognitionDialog';
 import './recognition.css';
 import { CropDialog } from './CropDialog';
 import { EditorCanvas, type Tool } from './EditorCanvas';
+import { ToolControls, ToolModeSelect } from './ToolControls';
 import { ReliefPreview, type PreviewCamera } from './ReliefPreview';
 import { NameField, NumberField } from './Fields';
 import { mergeRegions, nextRegionId, projectStats } from './model';
 import type { SelectionOperation } from './selection';
+import { combineSelection, regionSelection } from './selection';
 import { trimRegion } from './trim';
 import { StlDialog } from './StlDialog';
 import { loadImage, readRaster } from './image';
@@ -255,6 +257,20 @@ export default function App() {
     // 激活区域不等于建立选区，已有显式选区继续保留。
     if (!advanced) setOperation('replace');
   }
+  function activateTool(next: Tool) {
+    if (busy || capabilityBusy) return;
+    setTool(next);
+    setMode('regions');
+  }
+  function selectWholeRegion(nextOperation: SelectionOperation = operation) {
+    if (!project || !region || busy || capabilityBusy) return;
+    // 全选是独立操作，先取消尚未返回的智能选区，避免旧结果覆盖它。
+    setSelectionReset(value => value + 1);
+    setSelecting(false);
+    setSelection(combineSelection(selection, regionSelection(project.labels, selected), nextOperation));
+    setMode('regions');
+    setView('edit');
+  }
   function assign(targetId: number, newRegion = false) {
     if (!project || !selection.length) return;
     const labels = project.labels.slice();
@@ -353,11 +369,13 @@ export default function App() {
         if (advanced) excludeSelection();
         else trimSelection('clear');
       } else if (!ctrl) {
+        if (key === 'w') {
+          selectWholeRegion(event.altKey ? 'subtract' : event.shiftKey ? 'add' : operation);
+          return;
+        }
         const found = tools.find((item) => item.key.toLowerCase() === key);
         if (found) {
-          setTool(found.id);
-          if (!['smart', 'rectangle', 'lasso', 'hand'].includes(found.id)) setAdvanced(true);
-          setMode('regions');
+          activateTool(found.id);
         }
       }
     };
@@ -483,40 +501,7 @@ export default function App() {
           {project && (
             <section className="sidebar-section workspace-tools">
               <h2>编辑工具</h2>
-              <div className="edit-tools">
-                {tools
-                  .filter(
-                    (item) => advanced || ['smart', 'rectangle', 'lasso', 'hand'].includes(item.id),
-                  )
-                  .map((item) => (
-                    <button
-                      key={item.id}
-                      aria-label={item.name}
-                      aria-pressed={tool === item.id}
-                      title={`${item.name} (${item.key})`}
-                      className={tool === item.id ? 'active' : ''}
-                      disabled={disabled}
-                      onClick={() => {
-                        setTool(item.id);
-                        setMode('regions');
-                      }}
-                    >
-                      <span aria-hidden="true">{item.icon}</span>
-                      {item.name}
-                    </button>
-                  ))}
-                <button
-                  className="more-tools"
-                  aria-pressed={advanced}
-                  onClick={() => {
-                    setAdvanced(!advanced);
-                    setTool('smart');
-                    setSelection([]);
-                  }}
-                >
-                  更多工具
-                </button>
-              </div>
+              <ToolControls tool={tool} disabled={disabled || capabilityBusy} onSelect={activateTool} />
             </section>
           )}
           <section className="sidebar-section">
@@ -621,6 +606,11 @@ export default function App() {
             </div>
             {project && (
               <div className="region-list-footer">
+                <button className="whole-region" disabled={disabled || capabilityBusy || !region}
+                  title="选择当前区域全部内容（W）；Shift 追加，Alt 减去"
+                  onClick={event => selectWholeRegion(event.altKey ? 'subtract' : event.shiftKey ? 'add' : operation)}>
+                  选择整个区域
+                </button>
                 <button
                   className="text-button"
                   disabled={disabled || project.regions.length >= 32}
@@ -680,6 +670,7 @@ export default function App() {
           ) : (
             <>
               <div className="tool-options">
+                <ToolModeSelect tool={tool} disabled={disabled || capabilityBusy} onSelect={activateTool} />
                 {['smart', 'lasso', 'rectangle', 'color', 'connected'].includes(tool) ? (
                   <>
                     {tool === 'lasso' && (
@@ -730,6 +721,7 @@ export default function App() {
                               ? '选取同一分区的所有像素'
                               : '仅选取相邻的同区像素'}
                     </span>
+                    <small>{advanced ? '画布跨区域选取' : '画布仅选当前区域'}</small>
                   </>
                 ) : tool === 'hand' ? (
                   <span>拖动画布平移；滚动查看放大后的图像</span>
@@ -827,7 +819,7 @@ export default function App() {
                   {(
                     [
                       ['color', '原图'],
-                      ['regions', '选区'],
+                      ['regions', '区域视图'],
                       ['layer', '逐层'],
                     ] as const
                   ).map(([id, label]) => (
@@ -935,7 +927,7 @@ export default function App() {
                 <ol className="simple-steps">
                   <li>左侧选择要修整的层</li>
                   <li>点选图案，或圈出范围</li>
-                  <li>选择清除或保留</li>
+                  <li>清除选中部分，或只留下选中部分</li>
                 </ol>
                 <div className="trim-actions">
                   <button
@@ -949,13 +941,13 @@ export default function App() {
                     disabled={disabled || selecting || !selectedCount}
                     onClick={() => trimSelection('keep')}
                   >
-                    保留
+                    只留选中部分
                   </button>
                 </div>
                 <p>
                   <b>清除：</b>去掉当前层选中部分。
                   <br />
-                  <b>保留：</b>只留下当前层选中部分。
+                  <b>只留选中部分：</b>删除当前层未选中的部分。
                 </p>
                 <small aria-live="polite">
                   {selecting
@@ -967,8 +959,13 @@ export default function App() {
                 <small>其他层不变 · 操作后可撤销</small>
               </section>
             )}
-            <details className="advanced-properties" open={advanced || undefined}>
+            <details className="advanced-properties">
               <summary>层属性与更多设置</summary>
+              <label className="selection-scope">
+                <input type="checkbox" aria-label="允许跨区域选取" checked={advanced} disabled={disabled}
+                  onChange={event => { setAdvanced(event.target.checked); setSelectionReset(value => value + 1); }} />
+                允许跨区域选取与排除
+              </label>
               <section className="sidebar-section">
                 <h2>区域属性</h2>
                 {project && region ? (
