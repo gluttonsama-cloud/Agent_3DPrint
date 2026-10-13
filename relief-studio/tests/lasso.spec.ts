@@ -115,3 +115,91 @@ test('平面、对照与 3D 切换区域或全选时保持视图', async () => {
     }
   } finally { await close(app); }
 });
+
+test('磁性套索按住拖动、退点、缩放平移和按钮确认，不选中页面文字', async () => {
+  const app = await launch();
+  try {
+    const page = await app.firstWindow(); await fixture(app, page);
+    await page.getByLabel('选区形状').selectOption('magnetic');
+    await at(page, 28, 28, false); await page.mouse.down();
+    await at(page, 100, 28, false); await at(page, 100, 100, false);
+    await page.mouse.up();
+    const before = Number(await page.locator('.canvas-viewport').getAttribute('data-lasso-points'));
+    await page.keyboard.press('Delete');
+    expect(Number(await page.locator('.canvas-viewport').getAttribute('data-lasso-points'))).toBeLessThan(before);
+    await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: '放大', exact: true }).click();
+    await at(page, 100, 100, false); await at(page, 28, 100, false); await at(page, 28, 28, false);
+    await page.keyboard.down('Space'); await page.mouse.down();
+    await page.mouse.move(850, 450, { steps: 4 }); await page.mouse.up(); await page.keyboard.up('Space');
+    await expect(page.getByRole('button', { name: '完成选区', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '完成选区', exact: true }).click();
+    await expect(page.locator('.canvas-viewport')).toHaveAttribute('data-lasso-points', '0');
+    await expect(page.getByTestId('selection-count')).not.toHaveAttribute('data-count', '0');
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('');
+  } finally { await close(app); }
+});
+
+test('科尔沁真实徽标放大后描牛头轮廓，可以确认且仅选择黑色主体', async () => {
+  const app = await launch();
+  try {
+    const page = await app.firstWindow();
+    await page.getByRole('button', { name: '打开示例工程', exact: true }).click();
+    await expect(page.getByLabel('图案编辑画布')).toHaveAttribute('data-ready', 'true');
+    await page.locator('.region-card').nth(0).click();
+    await page.getByRole('button', { name: '选区', exact: true }).click();
+    await page.getByLabel('选区形状').selectOption('magnetic');
+    await page.keyboard.press('Control+1');
+    await page.getByRole('button', { name: '放大', exact: true }).click();
+    const b = (await page.getByLabel('图案编辑画布').boundingBox())!;
+    const outline = [[195,132],[177,138],[151,135],[126,131],[148,139],[174,145],[168,166],
+      [171,188],[181,210],[194,210],[211,214],[219,203],[220,181],[216,160],[212,145],
+      [244,139],[274,131],[239,136],[211,138],[203,133],[195,132]];
+    for (let i = 0; i < outline.length; i++) {
+      const [x,y] = outline[i];
+      await page.mouse.move(b.x + x / 410 * b.width, b.y + y / 410 * b.height, { steps: 4 });
+      if (i === 0) await page.mouse.down();
+    }
+    await page.mouse.up();
+    await page.screenshot({ path: 'artifacts/workbench/magnetic-logo-draft.png' });
+    await page.getByRole('button', { name: '完成选区', exact: true }).click();
+    await expect(page.locator('.canvas-viewport')).toHaveAttribute('data-lasso-points', '0');
+    await expect.poll(async () => Number(await page.getByTestId('selection-count').getAttribute('data-count'))).toBeGreaterThan(500);
+    expect(Number(await page.getByTestId('selection-count').getAttribute('data-count'))).toBeLessThan(5000);
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('');
+    await page.screenshot({ path: 'artifacts/workbench/magnetic-logo-confirmed.png' });
+    await page.getByRole('button', { name: '清除', exact: true }).click();
+    const filename = path.join(process.cwd(), 'artifacts', 'magnetic-logo-cleared.json');
+    await app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: file }); }, filename);
+    await page.getByRole('button', { name: '保存工程', exact: true }).click();
+    await expect(page.locator('.statusbar')).toContainText('工程已保存');
+    const saved = decodeProject(JSON.parse(await fs.readFile(filename, 'utf8')));
+    const original = JSON.parse(await fs.readFile('samples/sample-project.json', 'utf8')) as { labels: number[] };
+    const changed = original.labels.flatMap((label, i) => label !== saved.labels[i] ? [i] : []);
+    expect(changed.length).toBeGreaterThan(500);
+    expect(changed.every(i => original.labels[i] === 1 && saved.labels[i] === 0 &&
+      i % 410 > 115 && i % 410 < 285 && Math.floor(i / 410) > 120 && Math.floor(i / 410) < 225)).toBe(true);
+  } finally { await close(app); }
+});
+
+test('小轮廓绕回起点仍可确认，拖出画布不选中文字', async () => {
+  const app = await launch();
+  try {
+    const page = await app.firstWindow(); await fixture(app, page);
+    await page.getByLabel('选区形状').selectOption('magnetic');
+    await page.getByRole('button', { name: '100%', exact: true }).click();
+    await at(page, 65, 65); await at(page, 89, 65, false); await at(page, 89, 89, false);
+    await at(page, 65, 89, false); await at(page, 65, 65, false);
+    await expect(page.getByRole('button', { name: '完成选区', exact: true })).toBeEnabled();
+    await page.keyboard.press('Enter');
+    await expect.poll(async () => Number(await page.getByTestId('selection-count').getAttribute('data-count'))).toBeGreaterThan(200);
+    await at(page, 35, 35, false); await page.mouse.down();
+    const b = (await page.getByLabel('图案编辑画布').boundingBox())!;
+    await page.mouse.move(b.x + b.width + 150, b.y + b.height + 120, { steps: 6 });
+    await page.mouse.up();
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.canvas-viewport')).toHaveAttribute('data-lasso-points', '0');
+    await expect(page.getByTestId('selection-count')).not.toHaveAttribute('data-count', '0');
+  } finally { await close(app); }
+});
