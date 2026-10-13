@@ -1,16 +1,16 @@
-# [**Relief Studio**](https://github.com/gluttonsama-cloud/Agent_3DPrint/releases/tag/relief-studio-v0.4.2-d2.4)
+# [**Relief Studio**](https://github.com/gluttonsama-cloud/Agent_3DPrint/releases/tag/relief-studio-v0.4.2-d2.5)
 
 Windows 浮雕制版工作台，用于 LOGO、文字和图案的主体识别、分色、轮廓修整及逐像素高度编辑。
 
 ## 下载与安装
 
-当前版本：**0.4.2-d2.4 候选版**，支持 Windows 10/11 x64。
+当前版本：**0.4.2-d2.5 候选版**，支持 Windows 10/11 x64。
 
-从 [Release](https://github.com/gluttonsama-cloud/Agent_3DPrint/releases/tag/relief-studio-v0.4.2-d2.4) 下载 `Relief-Studio-Complete-Setup-0.4.2-d2.4.exe`，约 **148 MB**。
+从 [Release](https://github.com/gluttonsama-cloud/Agent_3DPrint/releases/tag/relief-studio-v0.4.2-d2.5) 下载 `Relief-Studio-Complete-Setup-0.4.2-d2.5.exe`，约 **148 MB**。
 
 - 手工编辑：安装时选择不启用 AI，无需下载模型。
 - AI 识别：选择启用 AI，程序检查 NVIDIA 显卡驱动，自动下载约 **2.61 GB** 的独立模型和 GPU 运行时，校验并安装；无需另装 Python 或 CUDA Toolkit。
-- 离线安装：将安装程序和两段 `.7z.001`、`.7z.002` 放在同一文件夹，再运行安装程序。
+- 离线安装：从 [d2.4 模型配套](https://github.com/gluttonsama-cloud/Agent_3DPrint/releases/tag/relief-studio-v0.4.2-d2.4) 取得两段 `.7z.001`、`.7z.002`，与新版安装程序放在同一文件夹，再运行安装程序。
 
 安装程序未签名，请核对发布来源及 `SHA256SUMS.txt`。详细步骤、空间要求和驱动说明见 [完整安装指引](relief-studio/docs/GPU完整安装指引.md)。
 

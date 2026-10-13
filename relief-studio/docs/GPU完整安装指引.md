@@ -1,10 +1,10 @@
 # Relief Studio 完整安装指引
 
-适用版本：0.4.2-d2.4，Windows 10/11 x64。
+适用版本：0.4.2-d2.5（模型配套仍为 d2.4），Windows 10/11 x64。
 
 ## 正常安装：只下载一个安装程序
 
-1. 打开 [d2.4 发布页](https://github.com/gluttonsama-cloud/Agent_3DPrint/releases/tag/relief-studio-v0.4.2-d2.4)，下载 `Relief-Studio-Complete-Setup-0.4.2-d2.4.exe`。
+1. 打开 [d2.5 发布页](https://github.com/gluttonsama-cloud/Agent_3DPrint/releases/tag/relief-studio-v0.4.2-d2.5)，下载 `Relief-Studio-Complete-Setup-0.4.2-d2.5.exe`。
 2. 运行安装程序，使用默认的当前用户安装路径即可。安装程序未签名；仅在确认文件来自上述发布页并核对校验值后继续安装。
 3. 安装程序会检测 NVIDIA 显卡及驱动。
    - 驱动可用：出现“是否启用 AI 主体识别”，点击“是”。
@@ -14,6 +14,8 @@
 5. 完成后启动 Relief Studio，导入图案，在识别窗口中选择主体提取，生成预览后检查并应用。需要局部调整时使用点击补选、点击排除或画笔。
 
 如果驱动安装要求重启，程序不会自动重启电脑。请保存其他工作并重启，再次运行同一个安装程序完成模型设置。
+
+更新 d2.5 会复用已安装且校验正常的 d2.4 模型，不重复下载 2.61 GB 配套；新用户启用 AI 时仍会自动下载。
 
 ## 硬件、网络与空间
 
@@ -44,9 +46,9 @@
 
 ## 网络较差时的离线安装
 
-正常联网安装不需要手工下载以下分卷。若要给离线电脑安装，在有网络的电脑从同一发布页下载：
+正常联网安装不需要手工下载以下分卷。若要给离线电脑安装，在有网络的电脑下载新版安装程序，并从 [d2.4 模型配套发布页](https://github.com/gluttonsama-cloud/Agent_3DPrint/releases/tag/relief-studio-v0.4.2-d2.4) 下载两段模型：
 
-- `Relief-Studio-Complete-Setup-0.4.2-d2.4.exe`
+- `Relief-Studio-Complete-Setup-0.4.2-d2.5.exe`
 - `relief-gpu-runtime-d2.4.7z.001`
 - `relief-gpu-runtime-d2.4.7z.002`
 

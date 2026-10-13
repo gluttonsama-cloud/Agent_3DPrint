@@ -14,7 +14,8 @@ test('安装后的完整 GPU 配套：真实主体、SAM、v2 导入识别与 CP
   await fs.mkdir(directory);
   try {
     expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(true);
-    expect(await app.evaluate(({ app }) => app.getVersion())).toBe('0.4.2-d2.4');
+    const version = await app.evaluate(({ app }) => app.getVersion());
+    expect(version).toBe(JSON.parse(await fs.readFile('package.json', 'utf8')).version);
     const page = await app.firstWindow();
     const status = await page.evaluate(() => window.relief!.subjectStatus());
     expect(status.installed).toBe(true);
@@ -39,7 +40,7 @@ test('安装后的完整 GPU 配套：真实主体、SAM、v2 导入识别与 CP
         recognitionStatus: recognition.result.status, heightStatus: height.result.status };
     }, image);
     expect(result).toEqual({ subjectOk: true, samOk: true, importStatus: 'success', recognitionStatus: 'success', heightStatus: 'success' });
-    await fs.writeFile(path.join(directory, 'report.json'), JSON.stringify({ version: '0.4.2-d2.4', status, result, executable: process.env.RELIEF_TEST_EXECUTABLE }, null, 2));
+    await fs.writeFile(path.join(directory, 'report.json'), JSON.stringify({ version, status, result, executable: process.env.RELIEF_TEST_EXECUTABLE }, null, 2));
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach(window => window.destroy()));
     await app.close();

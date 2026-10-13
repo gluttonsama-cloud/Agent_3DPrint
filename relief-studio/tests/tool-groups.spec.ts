@@ -6,6 +6,11 @@ import { decodeProject } from '../src/project-codec';
 async function launch() {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
+  if (env.RELIEF_TEST_PACKAGED === '1') {
+    env.PATH = `${process.env.SystemRoot}\\System32`;
+    delete env.PYTHONHOME; delete env.PYTHONPATH;
+    return electron.launch({ executablePath: env.RELIEF_TEST_EXECUTABLE || path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), env });
+  }
   return electron.launch({ args: [process.cwd()], env });
 }
 
