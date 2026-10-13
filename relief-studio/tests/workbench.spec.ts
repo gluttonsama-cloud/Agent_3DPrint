@@ -1,15 +1,26 @@
 import { test, expect, _electron as electron } from '@playwright/test';
+import path from 'node:path';
 
 function launchEnv(): Record<string, string> {
   const env = Object.fromEntries(Object.entries(process.env)
     .filter((entry): entry is [string, string] => entry[1] !== undefined));
   delete env.ELECTRON_RUN_AS_NODE;
+  if (env.RELIEF_TEST_PACKAGED === '1') {
+    env.PATH = `${process.env.SystemRoot}\\System32`;
+    delete env.PYTHONHOME; delete env.PYTHONPATH;
+  }
   return env;
 }
 
-test('工作台并排预览保留二维选区，顶部撤销恢复尺寸', async () => {
+async function launch() {
   const env = launchEnv();
-  const app = await electron.launch({ args: [process.cwd()], env });
+  return env.RELIEF_TEST_PACKAGED === '1'
+    ? electron.launch({ executablePath: env.RELIEF_TEST_EXECUTABLE || path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), env })
+    : electron.launch({ args: [process.cwd()], env });
+}
+
+test('工作台并排预览保留二维选区，顶部撤销恢复尺寸', async () => {
+  const app = await launch();
   const page = await app.firstWindow();
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -95,8 +106,7 @@ test('工作台并排预览保留二维选区，顶部撤销恢复尺寸', async
 });
 
 test('空格临时平移保持擦除工具，失焦与 Esc 取消未提交笔画', async () => {
-  const env = launchEnv();
-  const app = await electron.launch({ args: [process.cwd()], env });
+  const app = await launch();
   const page = await app.firstWindow();
   try {
     // 测试失败时也能关闭窗口，避免原生未保存对话框阻塞错误报告。
