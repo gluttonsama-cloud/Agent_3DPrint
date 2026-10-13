@@ -26,7 +26,7 @@ test('工作台并排预览保留二维选区，顶部撤销恢复尺寸', async
     await page
       .locator('.left-panel')
       .getByRole('button', {
-        name: '框选',
+        name: '选区',
         exact: true,
       })
       .click();
@@ -68,11 +68,11 @@ test('工作台并排预览保留二维选区，顶部撤销恢复尺寸', async
       .click();
     await expect(width).toHaveValue(original);
     await page.setViewportSize({ width: 960, height: 760 });
-    await page.getByRole('button', { name: '更多工具', exact: true }).click();
+    await page.getByRole('button', { name: '修补', exact: true }).click();
     const toolsBox = (await page.locator('.workspace-tools').boundingBox())!;
     const moreBox = (await page
       .getByRole('button', {
-        name: '更多工具',
+        name: '修补',
         exact: true,
       })
       .boundingBox())!;
@@ -109,7 +109,8 @@ test('空格临时平移保持擦除工具，失焦与 Esc 取消未提交笔画
     await page.getByRole('button', { name: '放大', exact: true }).click();
     await page.getByRole('button', { name: '放大', exact: true }).click();
     await page.keyboard.press('e');
-    const erase = page.getByRole('button', { name: '擦除', exact: true });
+    const erase = page.getByRole('button', { name: '修补', exact: true });
+    await expect(page.getByLabel('修补方式')).toHaveValue('erase');
     const undo = page.getByRole('button', { name: '撤销', exact: true });
     const viewport = page.locator('.canvas-viewport');
     const host = (await viewport.boundingBox())!;
