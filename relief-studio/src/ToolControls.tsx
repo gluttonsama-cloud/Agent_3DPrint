@@ -6,7 +6,8 @@ const groups = [
     { tool: 'smart', name: '智能点选' }, { tool: 'connected', name: '连通选区' },
   ] },
   { id: 'selection', name: '选区', icon: '□', label: '选区形状', options: [
-    { tool: 'rectangle', name: '矩形' }, { tool: 'lasso', name: '自由圈选' },
+    { tool: 'rectangle', name: '矩形' }, { tool: 'lasso', name: '自由套索' },
+    { tool: 'polygon', name: '多边形套索' }, { tool: 'magnetic', name: '磁性套索' },
   ] },
   { id: 'repair', name: '修补', icon: '╱', label: '修补方式', options: [
     { tool: 'brush', name: '补画' }, { tool: 'erase', name: '擦除' },

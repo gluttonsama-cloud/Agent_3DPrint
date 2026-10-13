@@ -12,6 +12,9 @@
 .view-edit .pane-heading { display: none; }
 .canvas-viewport { position: relative; overflow: hidden; touch-action: none; overscroll-behavior: contain; }
 .canvas-viewport.is-panning { cursor: grab; }
+.tool-polygon .art-canvas, .tool-magnetic .art-canvas { cursor: crosshair; }
+.art-canvas:focus { outline: none; }
+.lasso-help { color: var(--muted); font-size: 10px; }
 .canvas-scroll-area { position: absolute; inset: 0; display: block; padding: 0; pointer-events: none; }
 .raster-frame { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; }
 .canvas-bottom { height: auto; min-height: 43px; flex-wrap: wrap; gap: 6px; padding-block: 6px; }

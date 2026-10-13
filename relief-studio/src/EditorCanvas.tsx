@@ -8,6 +8,8 @@ import {
   type SelectionOperation,
 } from './selection';
 import { loadImage } from './image';
+import { buildSelectionImage, type SelectionImage } from './smart-selection';
+import { magneticPoint, magneticSegment, type LassoPoint } from './editor/magnetic-lasso';
 import { fitScale, isEditingTarget, screenToImage, zoomAt, type CanvasCamera } from './editor/viewport';
 
 export type Tool =
@@ -18,6 +20,8 @@ export type Tool =
   | 'hand'
   | 'smart'
   | 'lasso'
+  | 'polygon'
+  | 'magnetic'
   | 'rectangle';
 export interface CanvasNavigation { fit(): void; actual(): void; zoom(factor: number): void }
 interface Props {
@@ -55,6 +59,12 @@ export function EditorCanvas(props: Props) {
   const outline = useRef<{ points: [number, number][]; operation: SelectionOperation } | null>(
     null,
   );
+  const anchored = useRef<{ points: LassoPoint[]; anchors: number[]; rawAnchors: LassoPoint[];
+    lastRaw: LassoPoint; hover: LassoPoint | null; operation: SelectionOperation } | null>(null);
+  const magneticImage = useRef<SelectionImage | null>(null);
+  const suppressClickUntil = useRef(0);
+  const closedPoint = useRef<LassoPoint | null>(null);
+  const [lassoPoints, setLassoPoints] = useState(0);
   const worker = useRef<Worker | null>(null);
   const requestId = useRef(0);
   const request = useRef<{ id: number; baseline: number[]; operation: SelectionOperation } | null>(
@@ -90,7 +100,7 @@ export function EditorCanvas(props: Props) {
     moveCamera({ scale: fitScale(host.clientWidth, host.clientHeight, project.width, project.height), x: 0, y: 0 });
   }
   function changeZoom(next: number, x = 0, y = 0) {
-    if (props.disabled || stroke.current || outline.current || pan.current) return;
+    if (props.disabled || stroke.current || outline.current || anchored.current || pan.current) return;
     fitting.current = false;
     moveCamera(zoomAt(cameraRef.current, next, x, y));
   }
@@ -110,7 +120,7 @@ export function EditorCanvas(props: Props) {
     const wheel = (event: WheelEvent) => {
       if (props.disabled) return;
       event.preventDefault();
-      if (stroke.current || outline.current || pan.current) return;
+      if (stroke.current || outline.current || anchored.current || pan.current) return;
       if (event.shiftKey && !event.ctrlKey && !event.metaKey) {
         fitting.current = false;
         const delta = event.deltaMode === 1 ? 16 : 1;
@@ -173,6 +183,7 @@ export function EditorCanvas(props: Props) {
   useEffect(() => {
     let alive = true;
     rgba.current = null;
+    magneticImage.current = null;
     loadImage(project.image)
       .then((image) => {
         if (!alive) return;
@@ -283,11 +294,26 @@ export function EditorCanvas(props: Props) {
     ctx.strokeStyle = '#182734';
     ctx.setLineDash([4 / scale, 4 / scale]);
     ctx.stroke();
+    const path = anchored.current;
+    if (path) {
+      ctx.beginPath();
+      path.points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+      if (path.hover) ctx.lineTo(...path.hover);
+      ctx.strokeStyle = '#0879c5'; ctx.lineWidth = 2 / scale; ctx.setLineDash([]); ctx.stroke();
+      // 闭合边仅作提示，提交前不改变选区。
+      ctx.lineTo(...path.points[0]); ctx.setLineDash([4 / scale, 4 / scale]); ctx.stroke();
+      ctx.setLineDash([]);
+      for (const count of path.anchors) {
+        const p = path.points[count - 1];
+        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#0879c5';
+        ctx.beginPath(); ctx.arc(p[0], p[1], 3 / scale, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+    }
   }
   useEffect(() => {
     renderOverlay(project.labels);
   }, [edges, project.labels, selected, tool, mode, scale, props.selectionReset]);
-  const point = (event: React.PointerEvent): [number, number] => {
+  const point = (event: { clientX: number; clientY: number }): [number, number] => {
     const box = base.current!.getBoundingClientRect();
     // 圈选使用像素边界坐标，必须允许拖到最右/最下边缘。
     return screenToImage(
@@ -296,7 +322,7 @@ export function EditorCanvas(props: Props) {
       box,
       project.width,
       project.height,
-      tool === 'rectangle' || tool === 'lasso',
+      ['rectangle', 'lasso', 'polygon', 'magnetic'].includes(tool),
     );
   };
   function dab(end: [number, number]) {
@@ -362,7 +388,66 @@ export function EditorCanvas(props: Props) {
       if (Math.hypot(p[0] - last[0], p[1] - last[1]) >= 1) path.points.push(p);
     }
   }
+  function refreshAnchored() {
+    setLassoPoints(anchored.current?.points.length ?? 0);
+    renderOverlay(project.labels);
+  }
+  function edgeImage() {
+    magneticImage.current ||= buildSelectionImage(rgba.current!.data, project.width, project.height);
+    return magneticImage.current;
+  }
+  function traceMagnetic(p: LassoPoint) {
+    const path = anchored.current;
+    if (!path || Math.hypot(p[0] - path.lastRaw[0], p[1] - path.lastRaw[1]) < 1) return;
+    const points = magneticSegment(edgeImage(), path.lastRaw, p, Math.max(2, Math.min(24, 10 / scale)));
+    for (const point of points) {
+      const last = path.points.at(-1)!;
+      if (Math.hypot(point[0] - last[0], point[1] - last[1]) < 1) continue;
+      if (path.points.length >= 12000) {
+        finish(true);
+        props.onError('轮廓过长，已取消本次绘制。请分段圈选，使用“添加选区”合并。');
+        return;
+      }
+      path.points.push(point);
+    }
+    path.lastRaw = p;
+  }
+  function finishAnchored(suppressAt?: LassoPoint) {
+    const path = anchored.current;
+    if (!path || path.points.length < 3) return;
+    anchored.current = null;
+    suppressClickUntil.current = suppressAt ? performance.now() + 300 : 0;
+    closedPoint.current = suppressAt ?? null;
+    const id = ++requestId.current;
+    request.current = { id, baseline: selection, operation: path.operation };
+    props.onSelecting(true);
+    worker.current?.postMessage({ id, type: 'outline', points: path.points, snap: false, radius: 0 });
+    refreshAnchored();
+  }
+  function anchorPoint(p: LassoPoint) {
+    if (performance.now() < suppressClickUntil.current && closedPoint.current &&
+        Math.hypot(p[0] - closedPoint.current[0], p[1] - closedPoint.current[1]) * scale <= 8) return;
+    let path = anchored.current;
+    if (!path) {
+      request.current = null; smartSeed.current = null; props.onSelecting(false);
+      const start = tool === 'magnetic' ? magneticPoint(edgeImage(), p, Math.max(2, Math.min(24, 10 / scale))) : p;
+      path = { points: [start], anchors: [1], rawAnchors: [p], lastRaw: p, hover: null, operation };
+      anchored.current = path;
+    } else if (path.points.length >= 3 && Math.hypot(p[0] - path.points[0][0], p[1] - path.points[0][1]) * scale <= 8) {
+      finishAnchored(p); return;
+    } else {
+      if (tool === 'magnetic') traceMagnetic(p);
+      else if (Math.hypot(p[0] - path.points.at(-1)![0], p[1] - path.points.at(-1)![1]) > 0) path.points.push(p);
+      if (!anchored.current) return;
+      if (path.anchors.at(-1) !== path.points.length) {
+        path.anchors.push(path.points.length); path.rawAnchors.push(p);
+      }
+      path.hover = null;
+    }
+    refreshAnchored();
+  }
   function finish(cancel = false) {
+    if (cancel && anchored.current) { anchored.current = null; refreshAnchored(); }
     if (outline.current) {
       const path = outline.current;
       outline.current = null;
@@ -394,15 +479,30 @@ export function EditorCanvas(props: Props) {
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
       if (props.disabled || event.isComposing || isEditingTarget(event.target)) return;
+      if (anchored.current && ['Enter', 'Backspace', 'Escape'].includes(event.key)) {
+        event.preventDefault(); event.stopImmediatePropagation();
+        if (event.key === 'Enter') finishAnchored();
+        else if (event.key === 'Escape') finish(true);
+        else {
+          const path = anchored.current;
+          if (path.points.length > path.anchors.at(-1)!) {
+            path.points.length = path.anchors.at(-1)!;
+          } else if (path.anchors.length > 1) {
+            path.anchors.pop(); path.rawAnchors.pop(); path.points.length = path.anchors.at(-1)!;
+          } else { finish(true); return; }
+          path.lastRaw = path.rawAnchors.at(-1)!; path.hover = null; refreshAnchored();
+        }
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && ['0', '1', '+', '=', '-'].includes(event.key)) {
         event.preventDefault();
-        if (stroke.current || outline.current || pan.current) return;
+        if (stroke.current || outline.current || anchored.current || pan.current) return;
         if (event.key === '0') fitCanvas();
         else if (event.key === '1') changeZoom(1);
         else changeZoom(cameraRef.current.scale * (event.key === '-' ? 0.8 : 1.25));
       }
       if (event.code === 'Space' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        if (!hovered.current || stroke.current || outline.current) return;
+        if (!hovered.current || stroke.current || outline.current || anchored.current) return;
         event.preventDefault();
         spaceHeld.current = true;
         setTemporaryPan(true);
@@ -432,11 +532,11 @@ export function EditorCanvas(props: Props) {
       props.onSelecting(false);
       finish(true);
     };
-    window.addEventListener('keydown', cancel);
+    window.addEventListener('keydown', cancel, true);
     window.addEventListener('keyup', release);
     window.addEventListener('blur', blur);
     return () => {
-      window.removeEventListener('keydown', cancel);
+      window.removeEventListener('keydown', cancel, true);
       window.removeEventListener('keyup', release);
       window.removeEventListener('blur', blur);
     };
@@ -452,10 +552,11 @@ export function EditorCanvas(props: Props) {
       className={`canvas-viewport${temporaryPan || tool === 'hand' ? ' is-panning' : ''}`}
       ref={viewport}
       data-scale={scale}
+      data-lasso-points={lassoPoints}
       onPointerDownCapture={(event) => {
         if (props.disabled || (event.button !== 0 && event.button !== 1)) return;
         if (tool !== 'hand' && !spaceHeld.current && event.button !== 1) return;
-        if (stroke.current || outline.current) finish(true);
+        if (stroke.current || outline.current || anchored.current) finish(true);
         fitting.current = false;
         pan.current = { x: event.clientX, y: event.clientY, left: cameraRef.current.x, top: cameraRef.current.y };
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -492,12 +593,21 @@ export function EditorCanvas(props: Props) {
             width={project.width}
             height={project.height}
             aria-label="图案编辑画布"
+            tabIndex={0}
             data-ready={rgba.current ? 'true' : 'false'}
             style={{ width: project.width * scale, height: project.height * scale }}
             onPointerDown={(event) => {
               if (props.disabled || !rgba.current || (event.button !== 0 && event.button !== 1))
                 return;
+              event.currentTarget.focus({ preventScroll: true });
               const p = point(event);
+              if (tool === 'polygon' || tool === 'magnetic') {
+                const starting = !anchored.current;
+                anchorPoint(p);
+                if (starting && anchored.current) anchored.current.operation = event.altKey ? 'subtract' : event.shiftKey ? 'add' : operation;
+                event.preventDefault();
+                return;
+              }
               if (tool === 'smart') {
                 const op = event.altKey ? 'subtract' : event.shiftKey ? 'add' : operation;
                 smartSeed.current = { point: p, baseline: selection, operation: op };
@@ -534,7 +644,11 @@ export function EditorCanvas(props: Props) {
             }}
             onPointerMove={(event) => {
               setCursor(point(event));
-              if (outline.current) {
+              if (anchored.current) {
+                if (tool === 'magnetic') traceMagnetic(point(event));
+                else anchored.current.hover = point(event);
+                refreshAnchored();
+              } else if (outline.current) {
                 appendOutline(point(event));
                 renderOverlay(project.labels);
                 const ctx = overlay.current!.getContext('2d')!;
@@ -549,7 +663,11 @@ export function EditorCanvas(props: Props) {
                 ctx.stroke();
               } else if (stroke.current) dab(point(event));
             }}
+            onDoubleClick={(event) => {
+              if (!props.disabled && anchored.current) { event.preventDefault(); finishAnchored(point(event)); }
+            }}
             onPointerUp={(event) => {
+              if (anchored.current) return;
               if (outline.current) appendOutline(point(event));
               finish();
             }}
