@@ -5,6 +5,19 @@ export interface CanvasBounds {
   height: number;
 }
 
+export interface CanvasCamera { scale: number; x: number; y: number }
+
+// 以视口中心为原点，缩放时保持鼠标下的图像位置不动。
+export function zoomAt(camera: CanvasCamera, scale: number, x = 0, y = 0): CanvasCamera {
+  const next = Math.max(0.05, Math.min(16, scale));
+  const ratio = next / camera.scale;
+  return { scale: next, x: x - (x - camera.x) * ratio, y: y - (y - camera.y) * ratio };
+}
+
+export function fitScale(width: number, height: number, imageWidth: number, imageHeight: number) {
+  return Math.max(0.05, Math.min((width - 64) / imageWidth, (height - 64) / imageHeight, 2));
+}
+
 // 使用实际画布边界转换，滚动和平移已经反映在 left／top 中。
 export function screenToImage(
   clientX: number,

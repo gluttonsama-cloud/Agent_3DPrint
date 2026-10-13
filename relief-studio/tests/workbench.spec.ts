@@ -49,12 +49,12 @@ test('工作台并排预览保留二维选区，顶部撤销恢复尺寸', async
     const count = page.getByTestId('selection-count');
     await expect(count).not.toHaveAttribute('data-count', '0');
     const selected = await count.getAttribute('data-count');
-    await page.getByRole('button', { name: '3D 浮雕', exact: true }).click();
-    await expect(page.locator('.right-panel .preview-host canvas')).toHaveCount(1);
+    await page.getByRole('button', { name: '对照', exact: true }).click();
+    await expect(page.locator('.center-panel .preview-host canvas')).toHaveCount(1);
     await expect(canvas).toBeVisible();
     await expect(count).toHaveAttribute('data-count', selected!);
     await page.screenshot({ path: 'artifacts/workbench/parallel-preview.png' });
-    await page.locator('.sidebar-preview summary').click();
+    await page.getByRole('button', { name: '平面编辑', exact: true }).click();
     await expect(page.locator('.preview-host canvas')).toHaveCount(0);
     await expect(canvas).toHaveAttribute('data-ready', 'true');
     await expect(count).toHaveAttribute('data-count', selected!);
@@ -127,10 +127,7 @@ test('空格临时平移保持擦除工具，失焦与 Esc 取消未提交笔画
     const x = host.x + host.width / 2;
     const y = host.y + host.height / 2;
     await page.mouse.move(x, y);
-    const before = await viewport.evaluate((element) => ({
-      left: element.scrollLeft,
-      top: element.scrollTop,
-    }));
+    const before = (await canvas.boundingBox())!;
     const pixels = await canvas.evaluate((element) => (element as HTMLCanvasElement).toDataURL());
     await page.keyboard.down('Space');
     await expect(page.locator('.raster-frame')).toHaveClass(/tool-hand/);
@@ -140,11 +137,9 @@ test('空格临时平移保持擦除工具，失焦与 Esc 取消未提交笔画
     await page.keyboard.up('Space');
     await expect(erase).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.raster-frame')).toHaveClass(/tool-erase/);
-    const after = await viewport.evaluate((element) => ({
-      left: element.scrollLeft,
-      top: element.scrollTop,
-    }));
-    expect(after.left > before.left || after.top > before.top).toBe(true);
+    const after = (await canvas.boundingBox())!;
+    expect(after.x).toBeCloseTo(before.x - 60, 0);
+    expect(after.y).toBeCloseTo(before.y - 45, 0);
     expect(await canvas.evaluate((element) => (element as HTMLCanvasElement).toDataURL())).toBe(
       pixels,
     );

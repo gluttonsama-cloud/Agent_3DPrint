@@ -193,30 +193,6 @@ select:disabled {
   font-size: 10px;
   white-space: nowrap;
 }
-.sidebar-preview {
-  border-bottom: 1px solid var(--line);
-}
-.sidebar-preview summary {
-  cursor: pointer;
-  padding: 14px 16px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.sidebar-preview-stage {
-  display: flex;
-  height: 230px;
-  margin: 0 8px 12px;
-  border-radius: 6px;
-  overflow: hidden;
-}
-.sidebar-preview .preview-hint {
-  width: calc(100% - 16px);
-  box-sizing: border-box;
-  white-space: normal;
-  font-size: 10px;
-  bottom: 6px;
-  text-align: center;
-}
 @media (max-width: 1150px) {
   .app-header {
     height: auto;

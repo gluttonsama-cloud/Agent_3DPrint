@@ -3,7 +3,7 @@ import type { Project, Region } from './types';
 import { RecognitionDialog } from './RecognitionDialog';
 import './recognition.css';
 import { CropDialog } from './CropDialog';
-import { EditorCanvas, type Tool } from './EditorCanvas';
+import { EditorCanvas, type Tool, type CanvasNavigation } from './EditorCanvas';
 import { ToolControls, ToolModeSelect } from './ToolControls';
 import { ReliefPreview, type PreviewCamera } from './ReliefPreview';
 import { NameField, NumberField } from './Fields';
@@ -74,8 +74,10 @@ export default function App() {
     [operation, setOperation] = useState<SelectionOperation>('replace');
   const [radius, setRadius] = useState(5),
     [mode, setMode] = useState<'color' | 'regions' | 'layer'>('regions');
-  const [view, setView] = useState<'edit' | 'preview'>('edit'),
+  const [view, setView] = useState<'edit' | 'compare' | 'preview'>('edit'),
     [zoom, setZoom] = useState(1);
+  const canvasNavigation = useRef<CanvasNavigation | null>(null);
+  const [canvasExpanded, setCanvasExpanded] = useState(false);
   const [layer, setLayer] = useState(1),
     [target, setTarget] = useState(0);
   const [mergeTarget, setMergeTarget] = useState(0);
@@ -401,6 +403,14 @@ export default function App() {
       const status = store.current!.accept(candidate, controller.signal);
       if (status === 'applied') changed();
       setNotice(({ applied: '高度已应用', stale: '已丢弃过期结果', cancelled: '已取消', error: '处理失败，工程保持不变' })[status]);
+      if (status === 'applied' && result.status === 'success' && request.operation.kind === 'suggest') {
+        const conflicts = result.value.diagnostics?.ambiguousRegionCount;
+        setNotice(!result.value.blocks.length
+          ? '没有可安全应用的高度变化，已保留现有高度'
+          : typeof conflicts === 'number' && conflicts > 0
+            ? `高度建议已应用；${conflicts} 个层级不明确的区域保持原高`
+            : '高度建议已应用');
+      }
       if (status === 'error' && result.status === 'error') setError(result.message);
     } catch (value) { setError(String(value)); }
     finally { if (task.current === controller) { task.current = null; setCapabilityBusy(false); } }
@@ -416,7 +426,7 @@ export default function App() {
     });
   }
   return (
-    <div className="app-shell">
+    <div className={`app-shell${canvasExpanded ? ' canvas-expanded' : ''}`}>
       <header className="app-header">
         <div className="brand">
           <span className="brand-symbol" aria-hidden="true">
@@ -638,18 +648,23 @@ export default function App() {
         <section className="center-panel">
           <div className="canvas-toolbar">
             <div className="view-tabs">
-              <button className="active" aria-pressed={true} onClick={() => setView('edit')}>
+              <button className={view === 'edit' ? 'active' : ''} aria-pressed={view === 'edit'} onClick={() => setView('edit')}>
                 平面编辑
               </button>
+              <button className={view === 'compare' ? 'active' : ''} aria-pressed={view === 'compare'}
+                disabled={!project} onClick={() => setView('compare')}>对照</button>
               <button
                 className={view === 'preview' ? 'active' : ''}
                 aria-pressed={view === 'preview'}
                 disabled={!project}
-                onClick={() => setView(view === 'preview' ? 'edit' : 'preview')}
+                onClick={() => setView('preview')}
               >
                 3D 浮雕
               </button>
             </div>
+            <button className="expand-canvas" disabled={!project} aria-pressed={canvasExpanded}
+              title="收起两侧面板，留出更大的编辑和对照空间"
+              onClick={() => setCanvasExpanded(value => !value)}>{canvasExpanded ? '显示面板' : '展开画布'}</button>
           </div>
           {!project ? (
             <div className="empty-stage">
@@ -668,7 +683,7 @@ export default function App() {
             </div>
           ) : (
             <>
-              <div className="tool-options">
+              <div className="tool-options" hidden={view === 'preview'}>
                 <ToolModeSelect tool={tool} disabled={disabled || capabilityBusy} onSelect={activateTool} />
                 {['smart', 'lasso', 'rectangle', 'color', 'connected'].includes(tool) ? (
                   <>
@@ -714,7 +729,7 @@ export default function App() {
                     </small>
                   </>
                 ) : tool === 'hand' ? (
-                  <span>拖动画布平移；滚动查看放大后的图像</span>
+                  <span>拖动画布平移 · 滚轮缩放</span>
                 ) : (
                   <>
                     {tool === 'brush' && (
@@ -755,9 +770,15 @@ export default function App() {
                   </>
                 )}
               </div>
+              <div className={`workbench-stage view-${view}`}>
+              <div className="editor-pane" hidden={view === 'preview'}>
+              <div className="pane-heading">平面编辑 <span>滚轮缩放 · 空格拖动</span></div>
               <div className="art-stage" style={{ pointerEvents: disabled ? 'none' : 'auto' }}>
                 <EditorCanvas
-                  disabled={disabled || !!(crop || recognition || pending || stl)}
+                  key={snapshot!.sessionId}
+                  navigation={canvasNavigation}
+                  onZoomChange={setZoom}
+                  disabled={disabled || view === 'preview' || !!(crop || recognition || pending || stl)}
                   project={project}
                   pixelHeights={snapshot?.heights}
                   simple={!advanced}
@@ -770,7 +791,6 @@ export default function App() {
                   radius={radius}
                   mode={mode}
                   layer={currentLayer}
-                  zoom={zoom}
                   operation={operation}
                   selection={selection}
                   onSelect={setSelected}
@@ -787,7 +807,13 @@ export default function App() {
                   onError={setError}
                 />
               </div>
-              <div className="selection-bar" aria-live="polite">
+              </div>
+              {view !== 'edit' && <div className="preview-pane">
+                <div className="pane-heading">3D 浮雕 <span>实时更新</span></div>
+                <ReliefPreview project={store.current?.previewSnapshot ?? snapshot!} cameraState={previewCamera} />
+              </div>}
+              </div>
+              <div className="selection-bar" hidden={view === 'preview'} aria-live="polite">
                 <span data-testid="selection-count" data-count={selection.length}>
                   {selecting ? '正在识别选区…' : selection.length
                     ? `已选 ${selection.length.toLocaleString()} 像素`
@@ -804,7 +830,7 @@ export default function App() {
                   取消选区
                 </button>
               </div>
-              <div className="canvas-bottom">
+              <div className="canvas-bottom" hidden={view === 'preview'}>
                 <div className="segmented">
                   {(
                     [
@@ -823,27 +849,17 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                <div className="zoom-controls">
-                  <button
-                    aria-label="缩小"
-                    disabled={zoom <= 0.5}
-                    onClick={() => setZoom(Math.max(0.5, zoom / 1.25))}
-                  >
-                    −
-                  </button>
-                  <button onClick={() => setZoom(1)} title="恢复适合窗口">
-                    {zoom === 1 ? '适合窗口' : `${Math.round(zoom * 100)}%`}
-                  </button>
-                  <button
-                    aria-label="放大"
-                    disabled={zoom >= 8}
-                    onClick={() => setZoom(Math.min(8, zoom * 1.25))}
-                  >
-                    ＋
-                  </button>
+                <div className="zoom-controls" role="group" aria-label="画布缩放">
+                  <button aria-label="缩小" title="Ctrl+−" disabled={zoom <= 0.05}
+                    onClick={() => canvasNavigation.current?.zoom(0.8)}>−</button>
+                  <output aria-label="缩放比例">{Math.round(zoom * 100)}%</output>
+                  <button aria-label="放大" title="Ctrl++" disabled={zoom >= 16}
+                    onClick={() => canvasNavigation.current?.zoom(1.25)}>＋</button>
+                  <button title="实际像素大小 Ctrl+1" onClick={() => canvasNavigation.current?.actual()}>100%</button>
+                  <button title="适合窗口 Ctrl+0" onClick={() => canvasNavigation.current?.fit()}>适合</button>
                 </div>
               </div>
-              {mode === 'layer' && (
+              {mode === 'layer' && view !== 'preview' && (
                 <div className="layer-control">
                   {maxLayer ? (
                     <>
@@ -928,20 +944,6 @@ export default function App() {
                 });
               }} />}
           </>}
-            {project && (
-              <details
-                className="sidebar-preview"
-                open={view === 'preview'}
-                onToggle={(event) => setView(event.currentTarget.open ? 'preview' : 'edit')}
-              >
-                <summary>3D 预览</summary>
-                {view === 'preview' && (
-                  <div className="sidebar-preview-stage">
-                    <ReliefPreview project={store.current?.previewSnapshot ?? snapshot!} cameraState={previewCamera} />
-                  </div>
-                )}
-              </details>
-            )}
             <details className="advanced-properties">
               <summary>更多区域操作</summary>
               <label className="selection-scope">
