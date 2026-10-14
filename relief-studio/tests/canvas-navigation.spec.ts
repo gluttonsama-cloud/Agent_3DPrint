@@ -5,8 +5,11 @@ import { decodeProject } from '../src/project-codec';
 
 test('真实画布定点缩放、空白处平移、缩放后笔刷与撤销', async () => {
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [process.cwd()], env });
+  const packaged = env.RELIEF_TEST_PACKAGED === '1';
+  if (packaged) { env.PATH = `${process.env.SystemRoot}\\System32`; delete env.PYTHONHOME; delete env.PYTHONPATH; }
+  const app = await electron.launch(packaged ? { executablePath: env.RELIEF_TEST_EXECUTABLE, env } : { args: [process.cwd()], env });
   try {
+    expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(packaged);
     const page = await app.firstWindow();
     await page.getByRole('button', { name: '打开示例工程', exact: true }).click();
     const canvas = page.getByLabel('图案编辑画布');
@@ -67,8 +70,11 @@ test('真实画布定点缩放、空白处平移、缩放后笔刷与撤销', as
 
 test('中央对照与独立 3D、紧凑高度面板在三种窗口尺寸下可用', async () => {
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [process.cwd(), '--d1'], env });
+  const packaged = env.RELIEF_TEST_PACKAGED === '1';
+  if (packaged) { env.PATH = `${process.env.SystemRoot}\\System32`; delete env.PYTHONHOME; delete env.PYTHONPATH; }
+  const app = await electron.launch(packaged ? { executablePath: env.RELIEF_TEST_EXECUTABLE, args: ['--d1'], env } : { args: [process.cwd(), '--d1'], env });
   try {
+    expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(packaged);
     const page = await app.firstWindow();
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
     await page.getByRole('button', { name: '打开示例工程', exact: true }).click();

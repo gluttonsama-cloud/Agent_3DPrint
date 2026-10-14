@@ -5,7 +5,19 @@ import { decodeProject } from '../src/project-codec';
 
 async function launch() {
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-  return electron.launch({ args: [process.cwd()], env });
+  const packaged = env.RELIEF_TEST_PACKAGED === '1';
+  if (packaged) {
+    env.PATH = `${process.env.SystemRoot}\\System32`;
+    delete env.PYTHONHOME; delete env.PYTHONPATH;
+  }
+  const app = await electron.launch(packaged ? {
+    executablePath: env.RELIEF_TEST_EXECUTABLE || path.join(process.cwd(), 'release/win-unpacked/Relief Studio.exe'), env,
+  } : { args: [process.cwd()], env });
+  try {
+    expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(packaged);
+    expect(await app.evaluate(({ app }) => app.getVersion())).toBe(JSON.parse(await fs.readFile('package.json', 'utf8')).version);
+  } catch (error) { await close(app); throw error; }
+  return app;
 }
 async function close(app: ElectronApplication) {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach(window => window.destroy()));

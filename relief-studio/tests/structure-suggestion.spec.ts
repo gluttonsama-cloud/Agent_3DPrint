@@ -5,8 +5,11 @@ import { decodeProject } from '../src/project-codec';
 
 test('真实徽标的歧义轮廓建议保持层高、颜色与历史不变', async () => {
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({ args: [process.cwd()], env });
+  const packaged = env.RELIEF_TEST_PACKAGED === '1';
+  if (packaged) { env.PATH = `${process.env.SystemRoot}\\System32`; delete env.PYTHONHOME; delete env.PYTHONPATH; }
+  const app = await electron.launch(packaged ? { executablePath: env.RELIEF_TEST_EXECUTABLE, env } : { args: [process.cwd()], env });
   try {
+    expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(packaged);
     const page = await app.firstWindow();
     await page.getByRole('button', { name: '打开示例工程', exact: true }).click();
     await expect(page.getByLabel('图案编辑画布')).toHaveAttribute('data-ready', 'true');
