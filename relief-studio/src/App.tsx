@@ -30,6 +30,8 @@ const tools: { id: Tool; name: string; key: string; icon: string }[] = [
   { id: 'smart', name: '智能点选', key: 'S', icon: '✦' },
   { id: 'rectangle', name: '框选', key: 'R', icon: '□' },
   { id: 'lasso', name: '圈选', key: 'L', icon: '⬡' },
+  { id: 'polygon', name: '多边形套索', key: 'P', icon: '⬡' },
+  { id: 'magnetic', name: '磁性套索', key: 'M', icon: '⌁' },
   { id: 'color', name: '同色选区', key: 'W', icon: '◉' },
   { id: 'connected', name: '连通选区', key: 'C', icon: '⌖' },
   { id: 'brush', name: '画笔', key: 'B', icon: '╱' },
@@ -253,7 +255,6 @@ export default function App() {
     setSelectionReset((value) => value + 1);
     setSelected(id);
     setMode('regions');
-    setView('edit');
     setTarget(0);
     setMergeTarget(0);
     // 激活区域不等于建立选区，已有显式选区继续保留。
@@ -271,7 +272,6 @@ export default function App() {
     setSelecting(false);
     setSelection(combineSelection(selection, regionSelection(project.labels, selected), nextOperation));
     setMode('regions');
-    setView('edit');
   }
   function assign(targetId: number, newRegion = false) {
     if (!project || !selection.length) return;
@@ -685,8 +685,12 @@ export default function App() {
             <>
               <div className="tool-options" hidden={view === 'preview'}>
                 <ToolModeSelect tool={tool} disabled={disabled || capabilityBusy} onSelect={activateTool} />
-                {['smart', 'lasso', 'rectangle', 'color', 'connected'].includes(tool) ? (
+                {['smart', 'lasso', 'polygon', 'magnetic', 'rectangle', 'color', 'connected'].includes(tool) ? (
                   <>
+                    {(tool === 'polygon' || tool === 'magnetic') && <span className="lasso-help"
+                      title="点击起点或双击 / Enter 闭合；Backspace 退点；Esc 取消；Shift 追加、Alt 减选">
+                      {tool === 'polygon' ? '逐点点击' : '点击起点，沿边缘移动'} · Enter 完成
+                    </span>}
                     {tool === 'lasso' && (
                       <label>
                         <input
