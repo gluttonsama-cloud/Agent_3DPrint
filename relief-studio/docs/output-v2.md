@@ -1,7 +1,7 @@
 # v2 独立输出模块
 
-`engine/export_layers.py` 提供 `export_bundle(snapshot, destination, *, formats=('png',), obj=False, device=None, settings=None, cancelled=lambda:False, progress=lambda completed,total,message:None)`。
-snapshot 必须是 `project_v2.decode_project` 返回的 NumPy 运行时工程；返回 `outputDirectory/files/checks/simulated=False`，files 为 `{path,role}` 数组（path 为绝对文件路径），checks 为 `{code,status,message}` 数组，与 TS ExportResult 一致。目标目录不能已存在，失败及取消删除临时目录，成功后同卷重命名发布。尚待主负责人绑定 JSONL/IPC 和 B 的 ExportPanel。
+`engine/export_layers.py` 提供 `export_bundle(snapshot, destination, *, formats=('png',), obj=False, device=None, settings=None, obj_options=None, cancelled=lambda:False, progress=lambda completed,total,message:None)`。
+snapshot 必须是 `project_v2.decode_project` 返回的 NumPy 运行时工程；返回 `outputDirectory/files/checks/simulated=False`，files 为 `{path,role}` 数组（path 为绝对文件路径），checks 为 `{code,status,message}` 数组，与 TS ExportResult 一致。目标目录不能已存在，失败及取消删除临时目录，成功后同卷重命名发布。桌面导出面板通过 v2 IPC 传入完整工程及选项。
 
 母版始终输出 project.json、RGBA color.png、8 位 coverage.png、16 位 height.png 和 white/0001.png 起的累计白墨蒙版。标签非零而高度零仍保留彩图；白墨第 k 层以 heights >= k 生成，无最大值归一化。母版白色表示有墨，设备极性只应用到 adapted 适配文件。零白墨工程没有 white 文件。母版坐标保持工程左上原点。
 
@@ -11,9 +11,23 @@ manifest 记录源 sessionId/revision、像素尺寸、毫米尺寸、母版/OBJ
 
 ## OBJ
 
-`export_obj(snapshot, directory, cancelled=..., progress=...)` 写 relief.obj、relief.mtl、texture.png 和 obj-meta.json。像素格保留原采样；连续同高行顶面合并，邻接高度差及孔洞输出侧壁，标签零不输出顶面，标签非零零高度输出 Z=0 基准面。XY 为毫米、左下原点、Z 向上，UV 随原图方向映射。设计高度固定 0.1 mm/层，标定曲线按层读取且禁止外推。
+`export_obj(snapshot, directory, cancelled=..., progress=..., options=None)` 写 relief.obj、relief.mtl、texture.png 和 obj-meta.json。桌面选中“附加 OBJ 查看模型”后默认封闭实体；“模型类型”也可选择旧的表面查看模式。独立 API 未传 options 仍保持旧的 surface 行为。
 
-先遍历估算面数及文本/纹理资源预算，超过 200 万三角面或 512 MiB 拒绝；逐行写文件，不创建全量 Python 顶点对象列表。OBJ 是查看交换表面，不保证闭合加工实体。同高顶面合并可能形成 T 接点。取消删除本次生成文件；已有同名文件明确拒绝。
+封闭实体选项为 `options={'mode':'solid', 'baseThicknessMm':1, 'repairDiagonalContacts':False}`，通过 export_bundle 时对应 `obj_options`，IPC/TS 请求对应 `objOptions`。底板默认 1 mm、可设为 0..100 mm，覆盖整个矩形画幅，最终顶高为底板加逐像素高度。零底板时零高度像素不形成实体；全零且无底板明确拒绝。设计高度沿用工程 0.1 mm/层，标定工程使用自身 mmByLayer 曲线，允许实测平台值。PNG 母版与工程不受模型底板影响。
+
+封闭 OBJ 和 STL 共用像素网格三角化，补齐底面、外壁及高度差侧壁，并沿角点高度断点拆分侧壁，避免 T 接点。不降采样。两种格式 XY 为毫米、左下原点、Z 向上。OBJ 的 UV 对应原图；实体贴图为合成白背景的 RGB，底板透明区仍可见，原始 RGBA color.png 保持不变。封闭 OBJ 保持相邻网格行的顶点和 UV 缓存，按实际索引预计算文本预算，最多 2500 万三角面及 1 GiB（含贴图和元数据）。浮点精度会合并不同高度或产生非有限坐标时明确拒绝。
+
+仅在对角接触的高度会形成非流形连接，默认拒绝。明确启用修复后，以实际毫米高度排序补连接，不截断小于 1 mm 的标定台阶；obj-meta.json 记录 repairedPixels 与 addedVolumeMm3。manifest 返回 OBJ_GEOMETRY_REPAIRED 警告，桌面状态栏提示只修改了模型；原工程、彩图及逐层打印图不变。
+
+`mode='surface'` 保留原行合并表面：非零标签零高度仍输出 Z=0 彩图面，无封闭底面，可能存在 T 接点，仅用于查看交换。该模式保留 200 万三角面及 512 MiB 上限。两个模式均拒绝已有同名目标，取消或失败清理本次生成文件；export_bundle 整体仍通过暂存目录原子发布。
+
+## STL
+
+`export_stl(project, destination, options)` 接收完整编码的 v2 工程或旧 v1 工程，输出新目录中的 model.stl 与 mesh-info.json。桌面使用完整 v2 快照，不再将倒角、平滑或局部调高退回区域默认高度。设计工程可在导出对话框指定 layerHeightMm（0.001..10 mm），仅影响本次模型；标定工程只读显示自身曲线，不传且不允许覆盖统一层高。旧 v1 API 仍要求显式 layerHeightMm。
+
+底板与角点修复规则同封闭 OBJ；最高处根据实际像素高度或标定曲线显示，不受三维预览夸张比例影响。二进制 STL 最多 2500 万三角面，逐行写入；输出目录必须不存在。mesh-info.json 记录实际转换参数 heightMapping、sourceHeightMapping、底板、三角面数、尺寸和修复体积。STL 不包含颜色或标准单位声明，导入切片器时选毫米。
+
+封闭、无退化面和体积检查只是文件几何验证；最小细节、材料、切片参数、RIP 与设备实际打印仍需验证。封闭实体也不代表已完成全部自交或制造工艺认证。
 
 ## 设备设置和标定
 

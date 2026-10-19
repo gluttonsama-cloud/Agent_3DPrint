@@ -1,3 +1,4 @@
+import type { PersistedProjectV2 } from './contracts';
 export interface Region {
   id: number;
   name: string;
@@ -26,12 +27,12 @@ export interface SegmentInput {
 }
 export interface StlOptions {
   repairDiagonalContacts?: boolean;
-  layerHeightMm: number;
+  layerHeightMm?: number;
   baseThicknessMm: number;
 }
 export interface Bridge {
   exportStl(input: {
-    project: Project;
+    project: Project | PersistedProjectV2;
     options: StlOptions;
   }): Promise<{ path: string; repairedPixels?: number } | null>;
   refine(input: {

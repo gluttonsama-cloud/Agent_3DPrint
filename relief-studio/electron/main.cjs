@@ -34,7 +34,10 @@ const engineCommand = require('./engine-command.cjs')(app, root, process.resourc
 
 async function runEngine(job, destination) {
   const serialized = JSON.stringify(job);
-  if (Buffer.byteLength(serialized) > 64_000_000) throw new Error('工程超过 64 MB 限制');
+  const fullHeightStl = job.action === 'stl' && job.project?.version === 2;
+  const limit = fullHeightStl ? 144 * 1024 ** 2 : 64_000_000;
+  if (Buffer.byteLength(serialized) > limit) throw new Error(`工程超过 ${fullHeightStl ? '144 MiB' : '64 MB'} 限制`);
+  const timeoutMs = job.action === 'stl' ? 600000 : 120000;
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'relief-job-'));
   try {
     const jobPath = path.join(temp, 'job.json');
@@ -53,9 +56,9 @@ async function runEngine(job, destination) {
       let stderr = '';
       let processError;
       const timer = setTimeout(() => {
-        processError = new Error('算法处理超过 120 秒，请减小图片或层数后重试');
+        processError = new Error(`算法处理超过 ${timeoutMs / 1000} 秒，请减小图片或层数后重试`);
         child.kill();
-      }, 120000);
+      }, timeoutMs);
       child.stdout.on('data', (chunk) => {
         stdout = (stdout + chunk.toString()).slice(-1_000_000);
       });
