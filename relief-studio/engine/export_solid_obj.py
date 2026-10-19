@@ -9,7 +9,9 @@ from height_mesh import checkpoint, prepare_heights, write_height_mesh
 
 MAX_TRIANGLES = 25_000_000
 MAX_BYTES = 1024**3
-HEADER = 'mtllib relief.mtl\nusemtl relief\n'
+HEADER = 'mtllib relief.mtl\n'
+MATERIALS = ('newmtl relief\nKd 1 1 1\nmap_Kd texture.png\n'
+             '\nnewmtl base\nKd 1 1 1\n')
 
 
 class _Writer:
@@ -17,6 +19,7 @@ class _Writer:
     self.size, self.stream = size, stream
     self.count = self.vertices = self.uvs = 0
     self.rows = {}
+    self.material = None
     self.bytes = overhead
     self.write(HEADER)
 
@@ -47,6 +50,11 @@ class _Writer:
     self.count += 1
     if self.count > MAX_TRIANGLES:
       raise ValueError('封闭 OBJ 超过 2500 万三角面上限；请显式降低输入采样')
+    # 只有朝上的表面使用彩图；侧壁及封闭底面保持无贴图材质。
+    material = 'relief' if normal[2] > 0 else 'base'
+    if material != self.material:
+      self.write(f'usemtl {material}\n')
+      self.material = material
     self.write('f ' + ' '.join(self.vertex(point) for point in (a, b, c)) + '\n')
 
   def quad(self, normal, a, b, c, d):
@@ -83,12 +91,12 @@ def export_solid_obj(snapshot, directory, options, cancelled, progress):
     texture[snapshot['labels'].reshape(heights.shape) == 0] = 255
     # 白底 RGB 纹理使无彩色覆盖的底板仍可见，包括统一高度盒子。
     Image.fromarray(texture).save(directory/names[2])
-    (directory/names[1]).write_text('newmtl relief\nKd 1 1 1\nmap_Kd texture.png\n', encoding='utf-8')
+    (directory/names[1]).write_text(MATERIALS, encoding='utf-8')
     metadata = {**info, 'units': 'mm', 'zAxis': 'up', 'triangles': writer.count,
                 'vertices': writer.vertices, 'estimatedBytes': counter.bytes,
                 'sizeMm': [*size, float(heights.max())],
                 'sampling': [snapshot['width'], snapshot['height']],
-                'source': source}
+                'source': source, 'textureScope': 'top-only'}
     (directory/names[3]).write_text(json.dumps(metadata, ensure_ascii=False), encoding='utf-8')
     if sum((directory/name).stat().st_size for name in names) > MAX_BYTES:
       raise ValueError('封闭 OBJ 超过 1 GiB 文件上限')

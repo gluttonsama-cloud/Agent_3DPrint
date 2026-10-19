@@ -39,6 +39,29 @@ def obj_triangles(path):
 
 
 class SolidMeshTests(unittest.TestCase):
+  def test_solid_obj_textures_only_upward_faces_and_keeps_closed_base(self):
+    for values in ([[1, 1], [1, 1]], [[0, 1, 3], [0, 1, 2]]):
+      source = snapshot(values)
+      with tempfile.TemporaryDirectory() as root:
+        target = Path(root)/'obj'
+        export_obj(source, target, options={'mode': 'solid'})
+        vertices, material = [], None
+        for line in (target/'relief.obj').read_text('utf-8').splitlines():
+          words = line.split()
+          if words[0] == 'v':
+            vertices.append(list(map(float, words[1:])))
+          elif words[0] == 'usemtl':
+            material = words[1]
+          elif words[0] == 'f':
+            tri = np.array([vertices[int(word.split('/')[0])-1] for word in words[1:]])
+            normal = np.cross(tri[1]-tri[0], tri[2]-tri[0])
+            self.assertEqual(material, 'relief' if normal[2] > 0 else 'base')
+        materials = (target/'relief.mtl').read_text('utf-8')
+        self.assertIn('newmtl base', materials)
+        self.assertNotIn('map_Kd', materials.split('newmtl base')[1])
+        check_closed_and_volume(self, obj_triangles(target/'relief.obj'),
+                                source['heights'].size + float(source['heights'].sum())*.1)
+
   def test_stl_uses_mixed_pixel_heights_instead_of_region_defaults(self):
     source = snapshot([[1, 3, 2], [1, 2, 2]])
     before = source['heights'].copy()
