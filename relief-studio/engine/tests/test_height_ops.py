@@ -36,6 +36,116 @@ def applied(value, candidate):
 
 
 class HeightTests(unittest.TestCase):
+  def test_bevel_uses_height_edges_not_color_or_selection_edges(self):
+    value = fixture(32, 32)
+    value['labels'].reshape(32, 32)[:, 16:] = 2
+    result = applied(value, run_height(value, {'kind': 'bevel', 'radiusPx': 4}))
+    # 等高分色不是物理边缘，中央分色线不能被刻成沟。
+    np.testing.assert_array_equal(result['heights'].reshape(32, 32)[12:20, 12:20], 12)
+    selection = np.zeros(32*32, dtype='uint8')
+    selection.reshape(32, 32)[12:20, 12:20] = 1
+    local = run_height(value, {'kind': 'bevel', 'radiusPx': 4}, selection)
+    self.assertEqual(local['blocks'], [])
+
+  def test_bevel_transitions_toward_neighbor_height_not_zero(self):
+    value = fixture(32, 32)
+    value['heights'][:] = 6
+    value['labels'].reshape(32, 32)[8:24, 8:24] = 2
+    value['heights'].reshape(32, 32)[8:24, 8:24] = 10
+    result = applied(value, run_height(value, {'kind': 'bevel', 'radiusPx': 4}))
+    heights = result['heights'].reshape(32, 32)
+    self.assertGreaterEqual(heights[16, 8], 6)
+    self.assertLess(heights[16, 8], 10)
+    self.assertEqual(heights[16, 7], 6)
+    self.assertEqual(heights[16, 16], 10)
+    for field in ('labels', 'colors', 'protection'):
+      np.testing.assert_array_equal(result[field], value[field])
+
+  def test_smoothing_does_not_raise_chamfer_edge_back_into_wall(self):
+    value = fixture(32, 32)
+    labels = value['labels'].reshape(32, 32)
+    labels[:] = 0
+    labels[8:24, 8:24] = 1
+    heights = value['heights'].reshape(32, 32)
+    heights[:] = 0
+    heights[8:24, 8:24] = 10
+    heights[8, 8:24] = heights[23, 8:24] = 2
+    heights[8:24, 8] = heights[8:24, 23] = 2
+    result = applied(value, run_height(value, {'kind': 'smooth', 'radiusPx': 3}))
+    self.assertLessEqual(result['heights'].reshape(32, 32)[8, 16], 2)
+    self.assertEqual(result['heights'].reshape(32, 32)[16, 16], 10)
+    self.assertTrue(np.all(result['heights'][value['labels'] == 0] == 0))
+
+  def test_bevel_mixed_support_has_no_nearest_base_seam_or_inverted_step(self):
+    value = fixture(64, 64)
+    heights = value['heights'].reshape(64, 64)
+    heights[:, :28] = 0
+    heights[:, 28:36] = 10
+    heights[:, 36:] = 8
+    result = applied(value, run_height(value, {'kind': 'bevel', 'radiusPx': 16}))
+    row = result['heights'].reshape(64, 64)[32]
+    self.assertTrue(np.all((row[28:36] >= 8) & (row[28:36] <= 10)))
+    self.assertLessEqual(np.abs(np.diff(row[28:36].astype(int))).max(), 1)
+    self.assertEqual(row[36], 8)
+
+  def test_bevel_local_write_matches_whole_geometry_with_protected_pixels(self):
+    value = fixture(40, 40)
+    value['heights'][:] = 6
+    value['heights'].reshape(40, 40)[8:32, 8:32] = 12
+    selection = np.zeros(40*40, dtype='uint8')
+    selection.reshape(40, 40)[8:20, 8:20] = 1
+    whole = applied(value, run_height(value, {'kind': 'bevel', 'radiusPx': 6}))
+    value['protection'][10*40+10] = 4
+    local = applied(value, run_height(value, {'kind': 'bevel', 'radiusPx': 6}, selection))
+    writable = (selection != 0) & (value['protection'] == 0)
+    np.testing.assert_array_equal(local['heights'][writable], whole['heights'][writable])
+    np.testing.assert_array_equal(local['heights'][~writable], value['heights'][~writable])
+
+  def test_smoothing_thin_line_and_ring_are_not_eroded_to_minimum(self):
+    for ring in (False, True):
+      value = fixture(32, 32)
+      labels = value['labels'].reshape(32, 32)
+      labels[:] = 0
+      labels[4, 4:28] = 1
+      if ring:
+        labels[27, 4:28] = labels[4:28, 4] = labels[4:28, 27] = 1
+      value['heights'][:] = 0
+      indices = np.flatnonzero(value['labels'])
+      value['heights'][indices] = np.resize([2, 100], len(indices))
+      result = applied(value, run_height(value, {'kind': 'smooth', 'radiusPx': 128}))
+      self.assertGreater(float(result['heights'][indices].mean()), 40)
+      self.assertLess(float(result['heights'][indices].mean()), 60)
+      self.assertLess(int(np.ptp(result['heights'][indices])), 98)
+      np.testing.assert_array_equal(result['heights'][value['labels'] == 0], 0)
+
+  def test_bevel_preserves_2048_existing_gradient_and_checks_mid_operation_cancel(self):
+    value = fixture(2048, 2048)
+    y, x = np.ogrid[:2048, :2048]
+    value['heights'] = ((x+y) % 256+1).astype('uint16').ravel()
+    self.assertEqual(run_height(value, {'kind': 'bevel', 'radiusPx': 16})['blocks'], [])
+    calls = 0
+
+    def cancel_after_start():
+      nonlocal calls
+      calls += 1
+      return calls > 1
+
+    with self.assertRaises(InterruptedError):
+      run_height(fixture(), {'kind': 'bevel', 'radiusPx': 4}, cancelled=cancel_after_start)
+
+  def test_real_logo_bevel_then_smooth_keeps_raised_text_above_gold(self):
+    path = Path(__file__).resolve().parents[2]/'samples/sample-project.json'
+    value = migrate_v1(json.loads(path.read_text(encoding='utf-8')))
+    text = value['heights'] == 10
+    result = value
+    for kind in ('bevel', 'smooth'):
+      result = applied(result, run_height(result, {'kind': kind, 'radiusPx': 4}))
+      self.assertGreaterEqual(int(result['heights'][text].min()), 5)
+      self.assertEqual(int(result['heights'][text].max()), 10)
+      np.testing.assert_array_equal(result['heights'][value['heights'] == 0], 0)
+      for field in ('labels', 'colors', 'protection'):
+        np.testing.assert_array_equal(result[field], value[field])
+
   def test_manual_quantization_protection_and_zero_label(self):
     value = fixture()
     value['labels'][0] = value['heights'][0] = 0

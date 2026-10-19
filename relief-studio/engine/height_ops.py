@@ -44,6 +44,47 @@ def number(operation, key, low, high, integer=False):
   return value
 
 
+def bevel_heights(source, labels, target, radius, cancelled):
+  result = source.astype('float64')
+  if not target.any():
+    return result
+  surface = np.pad(np.where(labels != 0, source, 0), 1)
+  center = surface[1:-1, 1:-1]
+  # 只处理有平坦内部的台面，保留细线和已经成坡的逐像素高度。
+  interior = ((center > 0) & (center == surface[:-2, 1:-1]) &
+              (center == surface[2:, 1:-1]) & (center == surface[1:-1, :-2]) &
+              (center == surface[1:-1, 2:]))
+  contours, _ = cv2.findContours(interior.astype('uint8'), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+  visited = surface.astype('int32')
+  flood_mask = np.zeros((surface.shape[0]+2, surface.shape[1]+2), dtype='uint8')
+  writable = np.pad(target, 1)
+  output = np.pad(result, 1)
+  cross = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype='uint8')
+  for index, contour in enumerate(contours):
+    check_cancel(cancelled)
+    x, y = (contour[0, 0]+1).tolist()
+    level = int(visited[y, x])
+    if level <= 0:
+      continue
+    marker = -index-1
+    _, _, _, (left, top, width, height) = cv2.floodFill(visited, flood_mask, (x, y), marker, flags=4)
+    area = np.s_[top-1:top+height+1, left-1:left+width+1]
+    plateau = visited[area] == marker
+    mask = plateau & writable[area]
+    if not mask.any():
+      continue
+    outline = (cv2.dilate(plateau.astype('uint8'), cross) != 0) & ~plateau
+    lower = outline & (surface[area] < level)
+    if not lower.any():
+      continue
+    # 同一台面统一朝最高邻接低面倒角，避免不同底面的最近点切换制造新陡壁。
+    base = int(surface[area][lower].max())
+    distance = cv2.distanceTransform((~lower).astype('uint8'), cv2.DIST_L2, 5)
+    factor = np.minimum(1, distance/radius)
+    output[area][mask] = np.maximum(1, base+(level-base)*factor[mask])
+  return output[1:-1, 1:-1]
+
+
 def run_height(snapshot, operation, selection=None, cancelled=lambda: False):
   check_cancel(cancelled)
   target = selected(snapshot, selection) & (snapshot['labels'] != 0)
@@ -117,28 +158,32 @@ def run_height(snapshot, operation, selection=None, cancelled=lambda: False):
     values[change] = np.minimum(maximum, suggested[change])
   else:
     radius = number(operation, 'radiusPx', 1, 128, True)
-    for region_id in np.unique(labels):
+    if kind == 'bevel':
+      values = bevel_heights(snapshot['heights'].reshape(shape), labels,
+                            target.reshape(shape), radius, cancelled).ravel()
+    for region_id in np.unique(labels) if kind == 'smooth' else ():
       if region_id == 0:
         continue
       check_cancel(cancelled)
       mask = (labels == region_id) & target.reshape(shape)
       if not mask.any():
         continue
-      if kind == 'bevel':
-        distance = cv2.distanceTransform(np.pad(mask.astype('uint8'), 1), cv2.DIST_L2, 5)[1:-1, 1:-1]
-        # 最外层至少保留一层；零层仍为零，不扩大范围或填孔。
-        factor = np.minimum(1, distance/radius)
-        current = values.reshape(shape)
-        current[mask] = np.where(current[mask] > 0, np.maximum(1, current[mask]*factor[mask]), 0)
-      else:
-        weight = mask.astype('float64')
-        current = values.reshape(shape)
-        kernel = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype='float64')
-        counts = cv2.filter2D(weight, -1, kernel, borderType=cv2.BORDER_CONSTANT)
-        for _ in range(radius):
-          check_cancel(cancelled)
-          sums = cv2.filter2D(current*weight, -1, kernel, borderType=cv2.BORDER_CONSTANT)
-          current[mask] = sums[mask]/counts[mask]
+      weight = mask.astype('float64')
+      current = values.reshape(shape)
+      kernel = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype='float64')
+      counts = cv2.filter2D(weight, -1, kernel, borderType=cv2.BORDER_CONSTANT)
+      region = (labels == region_id).astype('uint8')
+      interior = cv2.erode(region, kernel.astype('uint8'), borderType=cv2.BORDER_CONSTANT, borderValue=0)
+      # 只固定有二维内部支撑的轮廓；一像素细线仍做双向平均，不逐轮侵蚀。
+      supported = cv2.dilate(interior, np.ones((3, 3), dtype='uint8')) != 0
+      edge = mask & (interior == 0) & supported
+      original = snapshot['heights'].reshape(shape)
+      for _ in range(radius):
+        check_cancel(cancelled)
+        sums = cv2.filter2D(current*weight, -1, kernel, borderType=cv2.BORDER_CONSTANT)
+        current[mask] = sums[mask]/counts[mask]
+        # 固定轮廓端点，向区域内部平滑；选区边界和保护边界不算轮廓。
+        current[edge] = original[edge]
   heights = np.clip(np.floor(values+.5), 0, 256).astype('uint16')
   changes = {'heights': heights}
   if manual:
