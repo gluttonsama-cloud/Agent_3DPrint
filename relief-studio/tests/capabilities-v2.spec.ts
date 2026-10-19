@@ -107,7 +107,7 @@ test('A 独立能力：真实调高、跨区擦除撤销、保存重开及 JPG/O
     await page.getByText('从输出文件独立检查 OBJ', { exact: true }).click();
     await page.getByLabel('OBJ 检查文件').setInputFiles(['relief.obj', 'relief.mtl', 'texture.png']
       .map(name => path.join(directory, 'bundle', name)));
-    await expect(page.getByLabel('OBJ 尺寸')).toContainText('4.000 × 3.000 × 1.000');
+    await expect(page.getByLabel('OBJ 尺寸')).toContainText('4.000 × 3.000 × 2.000');
     await page.screenshot({ path: path.join(directory, 'capabilities.png'), fullPage: true });
     await page.getByLabel('OBJ 检查文件').setInputFiles({ name: 'empty.obj', mimeType: 'text/plain', buffer: Buffer.from('# empty') });
     await expect(page.getByLabel('OBJ 尺寸')).toContainText('没有可查看的网格');

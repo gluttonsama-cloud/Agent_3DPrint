@@ -56,7 +56,7 @@ def execute_v2(job):
         from export_layers import export_bundle
         value = export_bundle(snapshot, payload['outputDirectory'], formats=payload['formats'],
                               obj=payload.get('obj', False), device=payload.get('device'),
-                              settings=payload.get('settings'),
+                              settings=payload.get('settings'), obj_options=payload.get('objOptions'),
                               cancelled=cancelled, progress=progress)
       elif action == 'save':
         value = save_project(snapshot, payload['path'])

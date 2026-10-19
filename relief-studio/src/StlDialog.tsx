@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { Project, StlOptions } from './types';
+import type { StlOptions } from './types';
+import type { ProjectSnapshot } from './contracts';
 
 export function StlDialog({
   project,
@@ -8,30 +9,29 @@ export function StlDialog({
   onCancel,
   onExport,
 }: {
-  project: Project;
+  project: ProjectSnapshot;
   busy: boolean;
   error: string;
   onCancel(): void;
   onExport(options: StlOptions): void;
 }) {
-  const [layer, setLayer] = useState('0.1');
+  const [layer, setLayer] = useState(project.heightMapping.kind === 'design' ? String(project.heightMapping.mmPerLayer) : '0.1');
   const [base, setBase] = useState('1');
   const [repair, setRepair] = useState(false);
   const [withBase, setWithBase] = useState(true);
   const thickness = Number(layer),
     bottom = withBase ? Number(base) : 0;
-  const used = new Set(project.labels);
-  const max = Math.max(0, ...project.regions.filter((r) => used.has(r.id)).map((r) => r.layers));
+  const calibrated = project.heightMapping.kind === 'calibrated';
+  let max = 0;
+  project.heights.forEach(value => { max = Math.max(max, value); });
+  const peak = project.heightMapping.kind === 'calibrated' ? project.heightMapping.mmByLayer[max] : max * thickness;
   const valid =
-    layer.trim() !== '' &&
-    Number.isFinite(thickness) &&
-    thickness >= 0.001 &&
-    thickness <= 10 &&
+    (calibrated || (layer.trim() !== '' && Number.isFinite(thickness) && thickness >= 0.001 && thickness <= 10)) &&
     (!withBase || base.trim() !== '') &&
     Number.isFinite(bottom) &&
     bottom >= (withBase ? 0.01 : 0) &&
     bottom <= 100 &&
-    (max > 0 || bottom > 0);
+    (peak > 0 || bottom > 0) && bottom + peak <= 10000;
   return (
     <div className="modal-backdrop">
       <form
@@ -43,7 +43,7 @@ export function StlDialog({
           event.preventDefault();
           if (valid && !busy)
             onExport({
-              layerHeightMm: thickness,
+              ...(calibrated ? {} : { layerHeightMm: thickness }),
               baseThicknessMm: bottom,
               repairDiagonalContacts: repair,
             });
@@ -70,7 +70,7 @@ export function StlDialog({
       >
         <h2>导出 STL 模型</h2>
         <p>成品尺寸 {project.sizeMm.join(' × ')} mm。模型使用毫米尺寸，不包含颜色。</p>
-        <label className="stack-field">
+        {calibrated ? <p>使用工程标定曲线（{project.heightMapping.kind === 'calibrated' ? project.heightMapping.profileId : ''}），逐像素换算实际高度。</p> : <><label className="stack-field">
           每层厚度（mm）
           <input
             autoFocus
@@ -85,7 +85,7 @@ export function StlDialog({
             onChange={(e) => setLayer(e.target.value)}
           />
         </label>
-        <small>示例值为 0.1 mm，请按需要填写；不会使用三维预览的夸张比例。</small>
+        <small>示例值为 0.1 mm，请按需要填写；不会使用三维预览的夸张比例。</small></>}
         <label className="base-toggle">
           <input
             type="checkbox"
@@ -131,7 +131,7 @@ export function StlDialog({
             仅在 STL 中补齐极小的连接缺口，可能增加局部材料；原工程不变。遇到角点连接错误时可开启。
           </small>
         </details>
-        <p>最高处：{valid ? `${(bottom + max * thickness).toFixed(3)} mm` : '请填写有效厚度'}</p>
+        <p>最高处：{valid ? `${(bottom + peak).toFixed(3)} mm` : '请填写有效厚度'}</p>
         {error && (
           <p className="stl-error" role="alert">
             {error}

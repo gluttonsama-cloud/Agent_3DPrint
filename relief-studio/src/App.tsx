@@ -12,6 +12,7 @@ import type { SelectionOperation } from './selection';
 import { combineSelection, regionSelection } from './selection';
 import { trimRegion } from './trim';
 import { StlDialog } from './StlDialog';
+import { encodeProject } from './project-codec';
 import { loadImage, readRaster } from './image';
 import { isEditingTarget } from './editor/viewport';
 import { EditorStore, diffSnapshot, heightCandidate } from './editor/store';
@@ -467,11 +468,6 @@ export default function App() {
             disabled={!project || disabled}
             onClick={() => {
               setError('');
-              if (snapshot && (snapshot.heightMapping.kind !== 'design' || snapshot.labels.some((id, index) =>
-                id && snapshot.heights[index] !== snapshot.regions.find(region => region.id === id)?.defaultLayers))) {
-                setError('当前工程含像素混合高度或标定曲线，请使用分层导出中的 OBJ；STL 暂仅支持区域均高工程');
-                return;
-              }
               setStl(true);
             }}
           >
@@ -942,7 +938,7 @@ export default function App() {
                 setCapabilityBusy(true); setError(''); setProgress(null);
                 void createCapabilityService(window.reliefV2!, setProgress).export(request, controller.signal).then(result => {
                   if (result.status === 'error') setError(result.message);
-                  else setNotice(result.status === 'cancelled' ? '导出已取消' : `分层文件已导出：${result.value.outputDirectory}`);
+                  else setNotice(result.status === 'cancelled' ? '导出已取消' : `分层文件已导出：${result.value.outputDirectory}${result.value.checks.filter(check => check.code === 'OBJ_GEOMETRY_REPAIRED').map(check => ` · ${check.message}`).join('')}`);
                 }).catch(value => setError(String(value))).finally(() => {
                   if (task.current === controller) { task.current = null; setCapabilityBusy(false); }
                 });
@@ -1114,15 +1110,15 @@ export default function App() {
           </button>
         )}
       </footer>
-      {stl && project && (
+      {stl && snapshot && (
         <StlDialog
-          project={project}
+          project={snapshot}
           busy={!!busy}
           error={error}
           onCancel={() => setStl(false)}
           onExport={(options) => {
             void run('导出 STL', async () => {
-              const result = await bridge().exportStl({ project, options });
+              const result = await bridge().exportStl({ project: encodeProject(snapshot), options });
               if (result) {
                 setNotice(
                   `STL 已导出：${result.path}${result.repairedPixels ? ` · 已修复 ${result.repairedPixels} 个像素连接（原工程不变）` : ''}`,

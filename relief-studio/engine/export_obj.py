@@ -11,8 +11,14 @@ MAX_BYTES = 512 * 1024**2
 
 
 def export_obj(snapshot, directory, cancelled=lambda: False,
-               progress=lambda completed, total, message: None):
+               progress=lambda completed, total, message: None, options=None):
   dumps_project(snapshot)
+  if options is not None:
+    if not isinstance(options, dict) or options.get('mode') not in ('solid', 'surface'):
+      raise ValueError('OBJ 模式必须为 solid/surface')
+    if options['mode'] == 'solid':
+      from export_solid_obj import export_solid_obj
+      return export_solid_obj(snapshot, directory, options, cancelled, progress)
   width, height = snapshot['width'], snapshot['height']
   labels = snapshot['labels'].reshape(height, width) != 0
   heights = snapshot['heights'].reshape(height, width)

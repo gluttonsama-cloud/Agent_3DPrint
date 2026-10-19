@@ -39,7 +39,7 @@ def jpeg_check(source, decoded):
           'holesBefore': holes(before), 'holesAfter': holes(after)}
 
 
-def export_bundle(snapshot, destination, *, formats=('png',), obj=False, device=None, settings=None,
+def export_bundle(snapshot, destination, *, formats=('png',), obj=False, device=None, settings=None, obj_options=None,
                   cancelled=lambda: False, progress=lambda completed, total, message: None):
   serialized = dumps_project(snapshot)
   config = output_settings(settings)
@@ -128,7 +128,9 @@ def export_bundle(snapshot, destination, *, formats=('png',), obj=False, device=
       checks.append({'code':'JPEG_ROUNDTRIP','status':'warning' if changed else 'passed','message':'JPEG 阈值轮廓或孔洞发生变化，见 jpeg-report.json' if changed else 'JPEG 阈值轮廓及孔洞回读一致；灰值误差见 jpeg-report.json'})
     if obj:
       from export_obj import export_obj
-      for name in export_obj(snapshot, temporary, cancelled=cancelled)['files']:
+      result = export_obj(snapshot, temporary, cancelled=cancelled, progress=progress, options=obj_options)
+      checks.extend(result.get('checks', []))
+      for name in result['files']:
         added(name,'obj')
     extension='jpg' if jpeg else 'png'
     tasks=[dict(task,step=index+1,channel=task['role'],format=extension,

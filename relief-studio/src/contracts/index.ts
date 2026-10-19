@@ -75,11 +75,17 @@ export interface ImportRequest {
   sizeMm: [number, number];
   keepBackground: boolean;
 }
+export interface ObjExportOptions {
+  mode: 'solid' | 'surface';
+  baseThicknessMm?: number;
+  repairDiagonalContacts?: boolean;
+}
 export interface ExportRequest {
   snapshot: ProjectSnapshot;
   device: DeviceProfile;
   formats: ('png' | 'jpg')[];
   obj: boolean;
+  objOptions?: ObjExportOptions;
   outputDirectory: string;
   settings?: OutputSettings; // 独立打印适配，不改变工程几何高度
 }
