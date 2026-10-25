@@ -1,9 +1,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
+const { existsSync } = require('node:fs');
 const path = require('node:path');
 const { setTimeout: delay } = require('node:timers/promises');
 const registerV2 = require('../electron/v2.cjs');
+const engineCommand = require('../electron/engine-command.cjs');
 
 function harness(options = {}) {
   const handlers = {};
@@ -12,6 +14,99 @@ function harness(options = {}) {
     cancelGraceMs: 50, ...options });
   return handlers;
 }
+
+test('CPU 分色和已有主体结果不等待 GPU 交接，也不占用 GPU 任务标记', async () => {
+  for (const payload of [{ mode: 'color' }, { mode: 'subject', subjectMask: { width: 1, height: 1 } }]) {
+    let preparations = 0;
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const commands = [];
+    const handlers = harness({ prepareEngine: async () => { preparations++; await gate; },
+      engineCommand: (action, body) => {
+        commands.push({ action, body });
+        return [process.execPath, [path.join(__dirname, 'fixtures/v2/task-engine.cjs')]];
+      } });
+    const pending = handlers['v2:recognition']({ requestId: 'cpu-recognition', payload });
+    try {
+      assert.equal(handlers.runtime.hasGpuTasks(), false);
+      const completed = await Promise.race([pending, delay(1000).then(() => null)]);
+      assert.equal(completed?.result.status, 'success', 'CPU 候选不能等待 GPU 资源释放');
+      assert.equal(preparations, 0);
+      assert.deepEqual(commands, [{ action: 'recognition', body: payload }]);
+    } finally { release(); await pending; }
+  }
+});
+
+test('序列化可能变成 null 的非法显式蒙版在启动引擎前拒绝', async () => {
+  let starts = 0;
+  let preparations = 0;
+  const handlers = harness({ prepareEngine: () => { preparations++; }, engineCommand: () => {
+    starts++;
+    return [process.execPath, [path.join(__dirname, 'fixtures/v2/task-engine.cjs')]];
+  } });
+  for (const mode of ['color', 'subject']) {
+    for (const subjectMask of [NaN, Infinity, -Infinity, new Date(NaN), new Date(), false, [], 0, 'mask']) {
+      const result = await handlers['v2:recognition']({ requestId: 'invalid-mask-shape', payload: { mode, subjectMask } });
+      assert.equal(result.result.status, 'error', '非法显式蒙版不能在 JSON 转 null 后变为预测请求');
+      assert.equal(handlers.runtime.hasGpuTasks(), false);
+    }
+  }
+  assert.equal(starts, 0);
+  assert.equal(preparations, 0);
+});
+
+test('CPU 识别保留计算任务取消和清理语义，不冒用高度或文件操作 action', async () => {
+  const handlers = harness({ prepareEngine: () => { throw new Error('CPU 不应交接 GPU'); } });
+  const pending = handlers['v2:recognition']({ requestId: 'cancel-cpu', payload: { mode: 'color', hang: true } });
+  let progress;
+  try {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      progress = await handlers['v2:progress']({ requestId: 'cancel-cpu' });
+      if (progress) break;
+      await delay(10);
+    }
+    assert.ok(progress?.pid, 'CPU 测试子进程必须启动');
+    assert.equal(handlers.runtime.hasGpuTasks(), false);
+    await handlers['v2:cancel']({ requestId: 'cancel-cpu' });
+    assert.equal((await Promise.race([pending, delay(1000).then(() => null)]))?.result.status, 'cancelled');
+    assert.throws(() => process.kill(progress.pid, 0));
+    await assert.rejects(fs.stat(progress.directory), { code: 'ENOENT' });
+  } finally {
+    if (progress?.pid) { try { process.kill(progress.pid); } catch {} }
+    await pending;
+  }
+});
+
+test('显式主体蒙版仍经真实 CPU 后端验证，非法蒙版和快照不能绕过解码', {
+  skip: !existsSync(path.join(__dirname, '..', '.venv', 'Scripts', 'python.exe')),
+}, async () => {
+  const root = path.resolve(__dirname, '..');
+  const command = engineCommand({ isPackaged: false }, root, 'unused');
+  const snapshot = JSON.parse(await fs.readFile(path.join(__dirname, 'fixtures/v2/normal-v2.json'), 'utf8'));
+  const mask = { width: snapshot.width, height: snapshot.height,
+    data: { type: 'uint8', encoding: 'base64-le', data: Buffer.alloc(snapshot.width * snapshot.height, 1).toString('base64') } };
+  const handlers = harness({ prepareEngine: () => { throw new Error('已提供蒙版不能启动 GPU 交接'); },
+    engineCommand: (action, payload) => {
+      const selected = command(action, payload);
+      assert.equal(selected[0], path.join(root, '.venv', 'Scripts', 'python.exe'));
+      return selected;
+    } });
+  const base = { snapshot, mode: 'subject', subjectMask: mask, keepBackground: false, protectionPolicy: 'preserve' };
+  assert.equal((await handlers['v2:recognition']({ requestId: 'real-cpu-valid', payload: base })).result.status, 'success');
+  const malformed = [
+    { ...base, subjectMask: { ...mask, width: mask.width + 1 } },
+    { ...base, subjectMask: { ...mask, data: { ...mask.data, data: Buffer.alloc(12, 2).toString('base64') } } },
+    { ...base, subjectMask: {} },
+    { ...base, snapshot: { ...snapshot, width: 0 } },
+    { ...base, selection: { ...mask, width: mask.width + 1 } },
+  ];
+  for (const [index, payload] of malformed.entries()) {
+    const result = await handlers['v2:recognition']({ requestId: `real-cpu-invalid-${index}`, payload });
+    assert.equal(result.result.status, 'error');
+    assert.equal(result.result.code, 'V2_OPERATION_FAILED', '应由真实后端拒绝，而非 GPU 交接失败');
+    assert.equal(handlers.runtime.hasGpuTasks(), false);
+  }
+});
 
 test('识别等待旧 GPU 资源释放，等待期间保留任务占用', async () => {
   let release;
@@ -37,23 +132,25 @@ test('识别等待旧 GPU 资源释放，等待期间保留任务占用', async 
   } finally { release(); await pending; }
 });
 
-test('资源交接时取消导入，不启动新的 GPU 进程', async () => {
-  let release;
-  let engineCalls = 0;
-  const gate = new Promise(resolve => { release = resolve; });
-  let preparing = false;
-  const handlers = harness({ prepareEngine: async () => { preparing = true; await gate; },
-    engineCommand: () => { engineCalls++; throw new Error('已取消时不应启动'); } });
-  const pending = handlers['v2:import']({ requestId: 'cancel-prepare', payload: {} });
-  try {
-    for (let attempt = 0; attempt < 100 && !preparing; attempt++) await delay(5);
-    assert.equal(preparing, true);
-    await handlers['v2:cancel']({ requestId: 'cancel-prepare' });
-    release();
-    assert.equal((await pending).result.status, 'cancelled');
-    assert.equal(engineCalls, 0, '取消后不得调用引擎入口');
-    assert.equal(handlers.runtime.hasGpuTasks(), false);
-  } finally { release(); await pending; }
+test('资源交接时取消导入或实际主体识别，不启动新的 GPU 进程', async () => {
+  for (const action of ['import', 'recognition']) {
+    let release;
+    let engineCalls = 0;
+    const gate = new Promise(resolve => { release = resolve; });
+    let preparing = false;
+    const handlers = harness({ prepareEngine: async () => { preparing = true; await gate; },
+      engineCommand: () => { engineCalls++; throw new Error('已取消时不应启动'); } });
+    const pending = handlers[`v2:${action}`]({ requestId: 'cancel-prepare', payload: { subjectMask: null } });
+    try {
+      for (let attempt = 0; attempt < 100 && !preparing; attempt++) await delay(5);
+      assert.equal(preparing, true);
+      await handlers['v2:cancel']({ requestId: 'cancel-prepare' });
+      release();
+      assert.equal((await pending).result.status, 'cancelled');
+      assert.equal(engineCalls, 0, '取消后不得调用引擎入口');
+      assert.equal(handlers.runtime.hasGpuTasks(), false);
+    } finally { release(); await pending; }
+  }
 });
 
 test('取消无响应的识别进程后，清理目录并释放任务槽', async () => {

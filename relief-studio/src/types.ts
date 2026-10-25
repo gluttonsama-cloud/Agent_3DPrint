@@ -22,6 +22,7 @@ export interface SegmentInput {
   validMask?: number[];
   subjectMask?: number[];
   subjectLayers?: number;
+  mergeMaterialShades?: boolean;
   sizeMm: [number, number];
   name: string;
 }

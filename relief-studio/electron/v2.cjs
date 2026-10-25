@@ -2,6 +2,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const { requiresGpu } = require('./engine-command.cjs');
 
 module.exports = function registerV2({ handle, engineCommand, chooseSave, chooseOpen, prepareEngine, cancelGraceMs = 10000 }) {
   const tasks = new Map();
@@ -17,9 +18,12 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
       return { requestId, result: fail(base, '请求编号或内容无效') };
     if (stopping) return { requestId, result: { status: 'cancelled', base } };
     if (tasks.size) return { requestId, result: fail(base, '已有 v2 任务正在执行') };
+    let gpu;
+    try { gpu = requiresGpu(action, payload); }
+    catch (error) { return { requestId, result: fail(base, error.message) }; }
     let finish;
     const done = new Promise(resolve => { finish = resolve; });
-    const task = { cancelled: false, directory: null, action, stop: null, done };
+    const task = { cancelled: false, directory: null, action, gpu, stop: null, done };
     tasks.set(requestId, task);
     try {
       task.directory = await fs.mkdtemp(path.join(os.tmpdir(), 'relief-v2-'));
@@ -42,9 +46,10 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
       const output = path.join(task.directory, 'result');
       await fs.writeFile(jobPath, job, 'utf8');
       if (task.cancelled) return { requestId, result: { status: 'cancelled', base } };
-      await prepareEngine?.(action);
+      // CPU 分色及已有主体蒙版的合并不卸载常驻模型；取消仍按原始 action 处理。
+      if (task.gpu) await prepareEngine?.(action, payload);
       if (task.cancelled || stopping) return { requestId, result: { status: 'cancelled', base } };
-      const [command, args] = engineCommand(action);
+      const [command, args] = engineCommand(action, payload);
       await new Promise((resolve, reject) => {
         const child = spawn(command, [...args, '--job', jobPath, '--out', output], {
           windowsHide: true, shell: false, stdio: ['ignore', 'ignore', 'pipe'],
@@ -106,7 +111,7 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
     catch { return null; }
   }, true);
   return {
-    hasGpuTasks: () => [...tasks.values()].some(task => ['import', 'recognition'].includes(task.action)),
+    hasGpuTasks: () => [...tasks.values()].some(task => task.gpu),
     async shutdown() {
       stopping = true;
       const pending = [...tasks.entries()];

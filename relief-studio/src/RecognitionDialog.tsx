@@ -4,6 +4,10 @@ import { loadImage } from './image';
 import { NumberField } from './Fields';
 import { combineSubjectMask } from './subject-mask';
 import { connectedSelection } from './model';
+import type { EditPatch, OperationResult, ProjectSnapshot, RecognitionRequest, SelectionMask } from './contracts';
+import { createCapabilityService } from './capability-service';
+import { applyCandidate } from './contracts/patch';
+import { toLegacy } from './editor/legacy-adapter';
 
 interface Props {
   image: string;
@@ -11,10 +15,25 @@ interface Props {
   sizeMm: [number, number];
   validMask?: number[];
   replacing: boolean;
+  snapshot?: ProjectSnapshot;
+  selection?: SelectionMask;
+  onCandidate?(result: OperationResult<EditPatch>, signal: AbortSignal): void;
   onCancel(): void;
   onApply(project: Project): void;
 }
+type RecognitionCandidate = {
+  project: Project;
+  snapshot: ProjectSnapshot;
+  result: Extract<OperationResult<EditPatch>, { status: 'success' }>;
+  signal: AbortSignal;
+};
 export function RecognitionDialog(props: Props) {
+  const [scope, setScope] = useState<'selection' | 'all'>(props.selection ? 'selection' : 'all');
+  const [preserve, setPreserve] = useState(true);
+  const [keepBackground, setKeepBackground] = useState(false);
+  const requestController = useRef<AbortController | null>(null);
+  const [colorCandidate, setColorCandidate] = useState<RecognitionCandidate | null>(null);
+  const [subjectCandidate, setSubjectCandidate] = useState<RecognitionCandidate | null>(null);
   const [route, setRoute] = useState<'color' | 'subject'>('color');
   const [automatic, setAutomatic] = useState(true),
     [count, setCount] = useState(3),
@@ -22,6 +41,7 @@ export function RecognitionDialog(props: Props) {
   const [height, setHeight] = useState(10),
     [preview, setPreview] = useState<Project | null>(null);
   const [subject, setSubject] = useState<Uint8Array | null>(null);
+  const [mergeMaterialShades, setMergeMaterialShades] = useState(false);
   const [subjectPreview, setSubjectPreview] = useState<Project | null>(null);
   const [subjectColor, setSubjectColor] = useState<number | null>(null);
   const [background, setBackground] = useState<Uint8Array | null>(null);
@@ -59,20 +79,59 @@ export function RecognitionDialog(props: Props) {
     return () => {
       alive.current = false;
       version.current++;
+      requestController.current?.abort();
       void window.relief?.cancelSubject();
       void window.relief?.cancelSegment();
     };
   }, [props.image]);
   const valid = (index: number) =>
-    !!source.current?.data[index * 4 + 3] && (!props.validMask || !!props.validMask[index]);
+    !!source.current?.data[index * 4 + 3] && (!props.validMask || !!props.validMask[index]) &&
+      (scope !== 'selection' || !props.selection || !!props.selection.data[index]);
+  const validMask = props.snapshot && scope === 'selection' && props.selection
+    ? Array.from(props.selection.data) : props.validMask;
+  function invalidatePreview() {
+    version.current++;
+    requestController.current?.abort();
+    setPreview(null); setSubjectPreview(null); setBackground(null);
+    setColorCandidate(null); setSubjectCandidate(null);
+    setStatus('设置已改变，请重新生成预览');
+  }
+  async function recognizeV2(id: number, mode: 'color' | 'subject', mask?: Uint8Array,
+    excluded?: Uint8Array | null, mergeShades = mergeMaterialShades) {
+    if (!props.snapshot || !window.reliefV2) throw new Error('重新识别需要桌面版 v2 引擎');
+    requestController.current?.abort();
+    const controller = new AbortController(); requestController.current = controller;
+    const toMask = (data: Uint8Array): SelectionMask => ({
+      width: props.snapshot!.width, height: props.snapshot!.height, data,
+    });
+    const request: RecognitionRequest = {
+      snapshot: props.snapshot, selection: scope === 'selection' ? props.selection : undefined,
+      mode, protectionPolicy: preserve ? 'preserve' : 'overwrite', keepBackground,
+      colorCount: mode === 'color' && !automatic ? count : undefined, tolerance,
+      mergeMaterialShades: mergeShades, defaultLayers: mode === 'color' ? 0 : height,
+      subjectMask: mask ? toMask(mask) : undefined,
+      excludedMask: excluded ? toMask(excluded) : undefined,
+    };
+    const result = await createCapabilityService(window.reliefV2).recognition(request, controller.signal);
+    if (!fresh(id) || controller.signal.aborted || result.status === 'cancelled') return null;
+    if (result.status === 'error') throw new Error(result.message);
+    const next = applyCandidate(props.snapshot, result.value);
+    return { project: toLegacy(next, props.image), snapshot: next, result, signal: controller.signal };
+  }
   function currentMask() {
     return subject || new Uint8Array((source.current?.width || 0) * (source.current?.height || 0));
   }
-  async function partitionSubject(mask: Uint8Array, id: number) {
+  async function partitionSubject(mask: Uint8Array, id: number, mergeShades = mergeMaterialShades) {
     setSubjectPreview(null);
+    setSubjectCandidate(null);
     setSubjectColor(null);
     if (!mask.some((value, index) => value && valid(index))) return null;
-    setStatus('正在识别主体颜色并合并近似色…');
+    setStatus(mergeShades ? '正在识别主体颜色并合并同色系明暗…' : '正在识别主体颜色…');
+    if (props.snapshot) {
+      const candidate = await recognizeV2(id, 'subject', mask, undefined, mergeShades);
+      if (candidate && fresh(id)) { setSubjectPreview(candidate.project); setSubjectCandidate(candidate); }
+      return candidate?.project ?? null;
+    }
     const result = await window.relief!.segment({
       image: props.image,
       name: props.name,
@@ -80,6 +139,7 @@ export function RecognitionDialog(props: Props) {
       validMask: props.validMask,
       subjectMask: Array.from(mask),
       subjectLayers: height,
+      mergeMaterialShades: mergeShades,
       colors: 'auto',
     });
     if (fresh(id)) setSubjectPreview(result);
@@ -95,6 +155,7 @@ export function RecognitionDialog(props: Props) {
     if (!history.length || busy) return;
     setSubject(history[history.length - 1]);
     setSubjectPreview(null);
+    setSubjectCandidate(null);
     setHistory(history.slice(0, -1));
     setShowOriginal(false);
     setStatus('已撤销上一步主体修改');
@@ -107,7 +168,10 @@ export function RecognitionDialog(props: Props) {
   }
   function draw(mask?: Uint8Array) {
     if (!source.current) return;
-    const data = new Uint8ClampedArray(source.current.data);
+    const candidate = props.snapshot && !showOriginal && !stroke.current
+      ? (route === 'color' && preview ? colorCandidate : route === 'subject' && subjectPreview ? subjectCandidate : null)
+      : null;
+    const data = new Uint8ClampedArray(candidate?.snapshot.colors ?? source.current.data);
     if (mask)
       for (let i = 0; i < mask.length; i++)
         if (!mask[i] && valid(i)) {
@@ -116,7 +180,8 @@ export function RecognitionDialog(props: Props) {
           data[i * 4 + 2] = Math.round(data[i * 4 + 2] * 0.1 + 123 * 0.9);
         }
     for (let i = 0; i < data.length / 4; i++)
-      if (!valid(i) || (route === 'color' && preview && background?.[i])) data[i * 4 + 3] = 0;
+      if (!valid(i) || (candidate && !candidate.snapshot.labels[i]) ||
+        (!props.snapshot && route === 'color' && preview && background?.[i])) data[i * 4 + 3] = 0;
     canvas
       .current!.getContext('2d')!
       .putImageData(new ImageData(data, source.current.width, source.current.height), 0, 0);
@@ -127,7 +192,7 @@ export function RecognitionDialog(props: Props) {
         ? Uint8Array.from(subjectPreview.labels, (label) => (label === subjectColor ? 1 : 0))
         : subject;
     draw(route === 'subject' && selected && !showOriginal ? selected : undefined);
-  }, [ready, subject, subjectColor, subjectPreview, showOriginal, route, background, preview]);
+  }, [ready, subject, subjectColor, subjectPreview, showOriginal, route, background, preview, scope, colorCandidate, subjectCandidate]);
   useEffect(() => {
     setBackground(null);
     setMarkBackground(false);
@@ -141,6 +206,17 @@ export function RecognitionDialog(props: Props) {
     const value = next[start] ? 0 : 1;
     for (const index of indices) next[index] = value;
     setBackground(next);
+    if (props.snapshot) {
+      setColorCandidate(null);
+      void run(async id => {
+        const candidate = await recognizeV2(id, 'color', undefined, next);
+        if (candidate && fresh(id)) {
+          setColorCandidate(candidate);
+          setStatus(value ? '已更新背景候选，人工保护按当前设置保留' : '已恢复点击区域');
+        }
+      });
+      return;
+    }
     setStatus(value ? '已排除相邻背景，再次点击可恢复' : '已恢复点击区域');
   }
   async function decode(mask: string) {
@@ -171,6 +247,10 @@ export function RecognitionDialog(props: Props) {
   }
   async function cancel() {
     version.current++;
+    requestController.current?.abort();
+    if (props.snapshot) {
+      setPreview(null); setSubjectPreview(null); setColorCandidate(null); setSubjectCandidate(null);
+    }
     setStatus('正在停止…');
     await Promise.all([window.relief?.cancelSubject(), window.relief?.cancelSegment()]);
     if (alive.current) {
@@ -186,7 +266,8 @@ export function RecognitionDialog(props: Props) {
     await run(async (id) => {
       if (!window.relief) throw new Error('请使用桌面版生成识别预览');
       if (route === 'color') {
-        const result = await window.relief.segment({
+        const candidate = props.snapshot ? await recognizeV2(id, 'color') : null;
+        const result = props.snapshot ? candidate?.project : await window.relief.segment({
           image: props.image,
           name: props.name,
           sizeMm: props.sizeMm,
@@ -194,9 +275,12 @@ export function RecognitionDialog(props: Props) {
           tolerance,
           validMask: props.validMask,
         });
-        if (fresh(id)) {
+        if (result && fresh(id)) {
           setPreview(result);
-          setStatus(`已识别 ${result.regions.length} 个区域，初始高度均为 0 层`);
+          setColorCandidate(candidate);
+          setStatus(props.snapshot
+            ? `已识别 ${result.regions.length} 个区域 · ${preserve ? '保留人工修改与已有像素高度' : '覆盖所选范围并重算为 0 层'}`
+            : `已识别 ${result.regions.length} 个区域，初始高度均为 0 层`);
         }
       } else {
         setStatus('正在提取主体并自动优化文字、轮廓与暗面…');
@@ -204,7 +288,7 @@ export function RecognitionDialog(props: Props) {
           id: String(id),
           action: 'propose',
           image: props.image,
-          validMask: props.validMask,
+          validMask,
         });
         if (!result.mask) throw new Error('模型未返回主体掩膜，请更新模型包');
         const mask = await decode(result.mask);
@@ -213,7 +297,7 @@ export function RecognitionDialog(props: Props) {
           if (fresh(id))
             setStatus(
               colors
-                ? `主体提取与自动优化已完成 · ${colors.regions.filter((r) => r.id !== 1).length} 个主体色区`
+                ? `主体提取与自动优化已完成 · ${colors.regions.filter((r) => r.name !== '平面背景').length} 个主体色区`
                 : '未识别到主体，可点击或画笔补选',
             );
         }
@@ -227,7 +311,7 @@ export function RecognitionDialog(props: Props) {
         id: String(id),
         action: 'predict',
         image: props.image,
-        validMask: props.validMask,
+        validMask,
         points: [{ x, y, label: 1 }],
       });
       if (!result.mask) throw new Error('模型未返回局部选区');
@@ -275,7 +359,7 @@ export function RecognitionDialog(props: Props) {
         id: String(id),
         action: 'predict',
         image: props.image,
-        validMask: props.validMask,
+        validMask,
         box,
       });
       if (!result.mask) throw new Error('模型未返回框选结果');
@@ -291,6 +375,14 @@ export function RecognitionDialog(props: Props) {
     });
   }
   function apply() {
+    if (props.snapshot) {
+      const candidate = route === 'color' ? colorCandidate : subjectCandidate;
+      if (!candidate || candidate.signal.aborted || (route === 'subject' && !currentMask().some(Boolean))) {
+        setStatus('请先生成有效的识别预览'); return;
+      }
+      props.onCandidate?.(candidate.result, candidate.signal);
+      return;
+    }
     if (route === 'color' && preview) {
       const labels = preview.labels.map((id, i) => (background?.[i] ? 0 : id));
       if (!labels.some((id) => id)) {
@@ -372,18 +464,34 @@ export function RecognitionDialog(props: Props) {
         </header>
         <div className="recognition-body">
           <aside>
+            {props.snapshot && (
+              <>
+                <label className="stack-field">重新识别范围
+                  <select aria-label="重新识别范围" value={scope} disabled={busy}
+                    onChange={event => { setScope(event.target.value as 'selection' | 'all'); invalidatePreview(); }}>
+                    <option value="selection" disabled={!props.selection}>当前选区</option>
+                    <option value="all">整张工作图</option>
+                  </select>
+                </label>
+                <label><input type="checkbox" checked={preserve} disabled={busy}
+                  onChange={event => { setPreserve(event.target.checked); invalidatePreview(); }} />保留人工修改</label>
+                <p className="muted">{preserve
+                  ? '保留人工范围、改色和高度；从原始图像重新分析，范围外保持不变。'
+                  : '覆盖重算所选范围：替换范围、恢复原色并重算高度，清除该范围的人工保护。可撤销。'}</p>
+              </>
+            )}
             <div className="view-tabs">
               <button
                 disabled={busy}
                 className={route === 'color' ? 'active' : ''}
-                onClick={() => setRoute('color')}
+                onClick={() => { setRoute('color'); setShowOriginal(false); if (props.snapshot) invalidatePreview(); }}
               >
                 自动分色
               </button>
               <button
                 disabled={busy}
                 className={route === 'subject' ? 'active' : ''}
-                onClick={() => setRoute('subject')}
+                onClick={() => { setRoute('subject'); setShowOriginal(false); if (props.snapshot) invalidatePreview(); }}
               >
                 主体提取
               </button>
@@ -451,7 +559,14 @@ export function RecognitionDialog(props: Props) {
                       <button
                         className="full-button"
                         disabled={busy}
-                        onClick={() => setBackground(null)}
+                        onClick={() => {
+                          setBackground(null);
+                          if (props.snapshot) setColorCandidate(null);
+                          if (props.snapshot) void run(async id => {
+                            const candidate = await recognizeV2(id, 'color');
+                            if (candidate && fresh(id)) { setColorCandidate(candidate); setStatus('已恢复全部背景'); }
+                          });
+                        }}
                       >
                         恢复全部背景
                       </button>
@@ -477,20 +592,41 @@ export function RecognitionDialog(props: Props) {
             ) : (
               <>
                 <p className="muted">{installed ? '本地 GPU 模型' : '未安装 GPU 模型包'}</p>
+                {props.snapshot && <label><input type="checkbox" checked={keepBackground} disabled={busy}
+                  onChange={event => { setKeepBackground(event.target.checked); invalidatePreview(); }} />保留零层背景</label>}
                 <label className="stack-field">
                   主体堆叠层数
                   <NumberField
                     label="主体堆叠层数"
                     value={height}
                     disabled={busy}
-                    onCommit={setHeight}
+                    onCommit={value => { setHeight(value); if (props.snapshot) invalidatePreview(); }}
                   />
                 </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={mergeMaterialShades}
+                    disabled={busy || !ready}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setMergeMaterialShades(enabled);
+                      setShowOriginal(false);
+                      if (subject)
+                        void run(async (id) => {
+                          await partitionSubject(subject, id, enabled);
+                          if (fresh(id)) setStatus('已更新主体颜色区域');
+                        });
+                    }}
+                  />
+                  合并同色系明暗
+                </label>
+                <p className="muted">适合反光材质；需要分别设置高度时保持关闭。</p>
                 {subjectPreview && (
                   <div className="recognition-colors">
                     <p className="muted">主体颜色 · 点击查看范围</p>
                     {subjectPreview.regions
-                      .filter((r) => r.id !== 1)
+                      .filter((r) => r.name !== '平面背景')
                       .map((region) => (
                         <button
                           key={region.id}
@@ -647,11 +783,12 @@ export function RecognitionDialog(props: Props) {
         </div>
         <footer>
           <p role="status">{status}</p>
-          {props.replacing && <p>应用后将替换当前区域与高度，可撤销。</p>}
+          {props.replacing && <p>{preserve ? '应用后保留人工修改，可撤销。' : '应用后覆盖所选范围的人工修改，可撤销。'}</p>}
           <button
             className="primary"
             disabled={
-              busy || !ready || (route === 'color' && !preview) || (route === 'subject' && !subject)
+              busy || !ready || (route === 'color' && !preview) || (route === 'subject' && !subject) ||
+              (!!props.snapshot && (route === 'color' ? !colorCandidate : !subjectCandidate || !subject?.some(Boolean)))
             }
             onClick={apply}
           >

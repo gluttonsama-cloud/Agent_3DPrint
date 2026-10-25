@@ -21,6 +21,23 @@ describe('v2 协议边界', () => {
       expect(() => decodeRaster({ type: 'uint8', encoding: 'base64-le', data }, 1)).toThrow();
     expect(decodeRaster(encodeRaster(new Uint8Array()), 0).length).toBe(0);
   });
+  it('子视图只编码可见范围，解码保持小端数值且不共享输入内存', () => {
+    const bytes = new Uint8Array([99, 7, 8, 100]);
+    const words = new Uint16Array([65535, 0x1234, 0x00ff, 0x0100, 65535]);
+    const byteView = bytes.subarray(1, 3), wordView = words.subarray(1, 4);
+    const encodedBytes = encodeRaster(byteView), encodedWords = encodeRaster(wordView);
+    expect(encodedBytes.data).toBe('Bwg=');
+    expect(Array.from(atob(encodedWords.data), char => char.charCodeAt(0)))
+      .toEqual([0x34, 0x12, 0xff, 0x00, 0x00, 0x01]);
+    const decodedBytes = decodeRaster(encodedBytes, 2);
+    const decodedWords = decodeRaster(encodedWords, 3);
+    expect(Array.from(decodedBytes)).toEqual([7, 8]);
+    expect(Array.from(decodedWords)).toEqual([0x1234, 0xff, 0x100]);
+    decodedBytes[0] = 0;
+    decodedWords[0] = 0;
+    expect(Array.from(bytes)).toEqual([99, 7, 8, 100]);
+    expect(Array.from(words)).toEqual([65535, 0x1234, 0xff, 0x100, 65535]);
+  });
   it('拒绝运行时原图改写和属性越权注入', () => {
     const snapshot = makeFixture();
     for (const payload of [

@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from project_v2 import decode_project, decode_raster, migrate_v1
-from height_ops import run_height
+from height_ops import physical_distance, run_height
 
 
 def fixture(width=8, height=8):
@@ -36,6 +36,154 @@ def applied(value, candidate):
 
 
 class HeightTests(unittest.TestCase):
+  def test_bevel_round_and_diamond_caps_do_not_become_height_spikes(self):
+    y, x = np.indices((11, 11))
+    for shape in ('diamond', 'circle'):
+      for operation in ({'kind': 'bevel', 'radiusPx': 8}, {'kind': 'bevel', 'widthMm': 8}):
+        with self.subTest(shape=shape, operation=operation):
+          value = fixture(11, 11)
+          value['sizeMm'] = [11, 11]
+          mask = (abs(y-5)+abs(x-5) <= 3) if shape == 'diamond' else ((y-5)**2+(x-5)**2 <= 16)
+          value['heights'] = (12*mask).astype('uint16').ravel()
+          value['labels'] = mask.astype('uint16').ravel()
+          result = applied(value, run_height(value, operation))['heights'].reshape(11, 11)
+          self.assertLess(int(result[mask].max()), 12)
+          radius = 3 if shape == 'diamond' else 4
+          for dy, dx in ((-radius, 0), (radius, 0), (0, -radius), (0, radius)):
+            self.assertEqual(result[5+dy, 5+dx], 2)
+
+  def test_bevel_keeps_connected_one_pixel_tail_bridge_and_standalone_line(self):
+    for bridge in (False, True):
+      for operation in ({'kind': 'bevel', 'radiusPx': 8}, {'kind': 'bevel', 'widthMm': 8}):
+        with self.subTest(bridge=bridge, operation=operation):
+          value = fixture(25, 13)
+          value['sizeMm'] = [25, 13]
+          source = value['heights'].reshape(13, 25)
+          source[:] = 0
+          source[3:8, 2:7] = 12
+          source[5, 7:17] = 12
+          source[10, 2:17] = 12
+          source[1, 23] = 12
+          if bridge:
+            source[3:8, 17:22] = 12
+          value['labels'] = (value['heights'] != 0).astype('uint16')
+          result = applied(value, run_height(value, operation))['heights'].reshape(13, 25)
+          np.testing.assert_array_equal(result[5, 7:17], 12)
+          np.testing.assert_array_equal(result[10, 2:17], 12)
+          self.assertEqual(result[1, 23], 12)
+          self.assertLess(result[4, 3], 12)
+
+  def test_physical_distance_matches_independent_brute_force_oracle(self):
+    rng = np.random.default_rng(904)
+    for shape in ((1, 9), (9, 1), (13, 17)):
+      for spacing in ((.125, .25), (3.75, .01), (.01, 3.75)):
+        for _ in range(4):
+          features = rng.random(shape) < .15
+          features[shape[0]//2, shape[1]//2] = True
+          sources = np.argwhere(features)
+          expected = np.empty(shape)
+          for y, x in np.ndindex(shape):
+            expected[y, x] = min(np.hypot((y-sy)*spacing[0], (x-sx)*spacing[1])
+                                 for sy, sx in sources)
+          np.testing.assert_allclose(physical_distance(features, spacing, lambda: False),
+                                     expected, rtol=1e-12, atol=1e-12)
+
+  def test_physical_distance_equal_spacing_matches_oracle_and_checks_cancel(self):
+    features = np.zeros((47, 53), dtype=bool)
+    features[3, 7] = features[40, 18] = features[20, 40] = True
+    y, x = np.indices(features.shape)
+    expected = np.sqrt(np.min([(y-sy)**2+(x-sx)**2 for sy, sx in np.argwhere(features)], axis=0))*.125
+    np.testing.assert_allclose(physical_distance(features, (.125, .125), lambda: False),
+                               expected, rtol=1e-7, atol=1e-7)
+    reference = physical_distance(features, (.125, np.nextafter(.125, np.inf)), lambda: False)
+    np.testing.assert_allclose(physical_distance(features, (.125, .125), lambda: False),
+                               reference, rtol=1e-7, atol=1e-7)
+    calls = 0
+
+    def cancelled():
+      nonlocal calls
+      calls += 1
+      return calls == 2
+
+    with self.assertRaises(InterruptedError):
+      physical_distance(features, (.125, .125), cancelled)
+
+  def test_bevel_mm_cancels_inside_distance_transform(self):
+    calls = 0
+
+    def cancelled():
+      nonlocal calls
+      calls += 1
+      return calls == 4
+
+    with self.assertRaises(InterruptedError):
+      run_height(fixture(512, 512), {'kind': 'bevel', 'widthMm': 2}, cancelled=cancelled)
+    self.assertEqual(calls, 4)
+
+  def test_bevel_mm_has_same_physical_width_at_three_resolutions(self):
+    for resolution in (512, 1024, 2048):
+      with self.subTest(resolution=resolution):
+        value = fixture(resolution, resolution)
+        value['sizeMm'] = [64, 64]
+        value['heights'][:] = 200
+        result = applied(value, run_height(value, {'kind': 'bevel', 'widthMm': 2}))
+        row = result['heights'].reshape(resolution, resolution)[resolution//2]
+        first_full = int(np.flatnonzero(row == 200)[0])+1
+        step = 64/resolution
+        self.assertLessEqual(abs(first_full*step-2), step+2/400)
+        halfway = round(1/step)-1
+        self.assertEqual(int(row[halfway]), 100)
+
+  def test_bevel_mm_uses_both_pixel_spacings_and_euclidean_hole_distance(self):
+    value = fixture(512, 512)
+    value['sizeMm'] = [64, 128]
+    value['heights'][:] = 200
+    value['labels'][256*512+256] = value['heights'][256*512+256] = 0
+    result = applied(value, run_height(value, {'kind': 'bevel', 'widthMm': 2}))
+    heights = result['heights'].reshape(512, 512)
+    self.assertEqual(heights[128, 7], 100)
+    self.assertEqual(heights[3, 128], 100)
+    for dy, dx in ((1, 2), (3, 4), (5, 6)):
+      distance = np.hypot(dx*.125, dy*.25)
+      self.assertEqual(heights[256+dy, 256+dx], int(np.floor(200*min(1, distance/2)+.5)))
+    self.assertEqual(heights[256, 256], 0)
+
+  def test_bevel_mm_preserves_thin_line_protection_selection_and_mixed_base(self):
+    value = fixture(64, 64)
+    value['sizeMm'] = [32, 64]
+    heights = value['heights'].reshape(64, 64)
+    heights[:, :28] = 0
+    heights[:, 28:36] = 10
+    heights[:, 36:] = 8
+    heights[16, 4:20] = 12
+    whole = applied(value, run_height(value, {'kind': 'bevel', 'widthMm': 8}))
+    np.testing.assert_array_equal(whole['heights'].reshape(64, 64)[16, 4:20], 12)
+    self.assertTrue(np.all(whole['heights'].reshape(64, 64)[32, 28:36] >= 8))
+    selection = np.zeros(64*64, dtype='uint8')
+    selection.reshape(64, 64)[8:40, 24:40] = 1
+    value['protection'][32*64+30] = 4
+    local = applied(value, run_height(value, {'kind': 'bevel', 'widthMm': 8}, selection))
+    writable = (selection != 0) & (value['protection'] == 0)
+    np.testing.assert_array_equal(local['heights'][writable], whole['heights'][writable])
+    np.testing.assert_array_equal(local['heights'][~writable], value['heights'][~writable])
+    for field in ('labels', 'colors', 'protection'):
+      np.testing.assert_array_equal(local[field], value[field])
+
+  def test_bevel_mm_strict_parameters_and_legacy_pixel_compatibility(self):
+    value = fixture(32, 32)
+    value['sizeMm'] = [16, 16]
+    legacy = applied(value, run_height(value, {'kind': 'bevel', 'radiusPx': 4}))
+    physical = applied(value, run_height(value, {'kind': 'bevel', 'widthMm': 2}))
+    np.testing.assert_array_equal(physical['heights'], legacy['heights'])
+    for width in (0, -1, float('nan'), float('inf'), True, '2', None):
+      with self.subTest(width=width), self.assertRaises(ValueError):
+        run_height(value, {'kind': 'bevel', 'widthMm': width})
+    for operation in ({'kind': 'bevel', 'widthMm': 2, 'radiusPx': 4},
+                      {'kind': 'bevel', 'widthMm': 2, 'radiusPx': None},
+                      {'kind': 'bevel'}, {'kind': 'smooth', 'radiusPx': 2, 'widthMm': 1}):
+      with self.subTest(operation=operation), self.assertRaises(ValueError):
+        run_height(value, operation)
+
   def test_bevel_uses_height_edges_not_color_or_selection_edges(self):
     value = fixture(32, 32)
     value['labels'].reshape(32, 32)[:, 16:] = 2
@@ -122,7 +270,7 @@ class HeightTests(unittest.TestCase):
     value = fixture(2048, 2048)
     y, x = np.ogrid[:2048, :2048]
     value['heights'] = ((x+y) % 256+1).astype('uint16').ravel()
-    self.assertEqual(run_height(value, {'kind': 'bevel', 'radiusPx': 16})['blocks'], [])
+    self.assertEqual(len(run_height(value, {'kind': 'bevel', 'radiusPx': 16})['blocks']), 0)
     calls = 0
 
     def cancel_after_start():

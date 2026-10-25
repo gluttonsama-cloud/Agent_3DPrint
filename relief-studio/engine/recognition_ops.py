@@ -52,18 +52,35 @@ def _sam(rgba, prompt):
 
 def recognize(snapshot, selection=None, *, keep_background=False,
               protection_policy='preserve', cancelled=lambda: False, predictor=None,
-              prompt=None, sam_predictor=None):
+              prompt=None, sam_predictor=None, mode='subject', color_count=None,
+              tolerance=12, merge_material_shades=False, default_layers=None,
+              subject_mask=None, excluded_mask=None):
   check_cancel(cancelled)
   target = selected(snapshot, selection)
-  if type(keep_background) is not bool or protection_policy not in ('preserve', 'overwrite'):
+  if (type(keep_background) is not bool or protection_policy not in ('preserve', 'overwrite')
+      or mode not in ('color', 'subject') or type(merge_material_shades) is not bool):
     raise ValueError('识别参数无效')
+  from relief import integer
+  if color_count is not None:
+    color_count = integer(color_count, 1, 12, '分区颜色数')
+  if type(tolerance) not in (int, float) or not np.isfinite(tolerance) or not 1 <= tolerance <= 50:
+    raise ValueError('颜色容差必须为 1 至 50')
+  default_layers = (0 if mode == 'color' else 10) if default_layers is None else integer(default_layers, 0, 256, '识别层数')
+  subject_mask = None if subject_mask is None else selected(snapshot, subject_mask)
+  excluded_mask = None if excluded_mask is None else selected(snapshot, excluded_mask)
   if not target.any():
     return patch(snapshot, {}, '自动识别：空选区')
   shape = (snapshot['height'], snapshot['width'])
   rgba = snapshot['original'].reshape(*shape, 4)
   visible = rgba[:, :, 3] > 0
   # 有透明通道时把已有可见范围当成明确主体，避免模型删细字。
-  if prompt is not None:
+  if mode == 'color':
+    probability = visible.astype('float32')
+    source = 'original-color'
+  elif subject_mask is not None:
+    probability = subject_mask.reshape(shape).astype('float32')
+    source = 'explicit-subject-mask'
+  elif prompt is not None:
     validated_prompt = _sam_prompt(prompt, snapshot['width'], snapshot['height'])
     predicted = (sam_predictor or _sam)(rgba.copy(), validated_prompt)
     if (not isinstance(predicted, np.ndarray) or predicted.shape != shape
@@ -87,18 +104,27 @@ def recognize(snapshot, selection=None, *, keep_background=False,
     source = 'injected-test-predictor' if predictor is not None else 'BiRefNet_HR'
   check_cancel(cancelled)
   foreground = (probability >= .5) & visible & target.reshape(shape)
+  if excluded_mask is not None:
+    foreground &= ~excluded_mask.reshape(shape)
   from relief import segment, encode_image
   # 复用现有 Lab 分色、抗锯齿边缘处理；v1 分色标签只作为临时候选。
   labels = snapshot['labels'].copy()
   heights = snapshot['heights'].copy()
   colors = snapshot['colors'].copy()
+  protection = snapshot['protection'].copy()
   labels[target] = 0
   heights[target] = 0
   regions = copy.deepcopy(snapshot['regions'])
   used = set()
   if foreground.any():
-    result = segment({'image': encode_image(rgba), 'subjectMask': foreground.ravel().astype(int).tolist(),
-                      'subjectLayers': 0, 'sizeMm': snapshot['sizeMm']})
+    job = {'image': encode_image(rgba), 'validMask': target.astype(int).tolist(),
+           'colors': 'auto' if color_count is None else color_count, 'tolerance': tolerance,
+           'mergeMaterialShades': merge_material_shades, 'sizeMm': snapshot['sizeMm']}
+    if mode == 'subject':
+      job.update(subjectMask=foreground.ravel().astype(int).tolist(), subjectLayers=default_layers)
+    else:
+      job['validMask'] = foreground.ravel().astype(int).tolist()
+    result = segment(job)
     candidate = np.asarray(result['labels'], dtype='uint16')
     occupied = {region['id'] for region in regions}
     for region in result['regions']:
@@ -107,26 +133,33 @@ def recognize(snapshot, selection=None, *, keep_background=False,
       if not mask.any() or (is_background and not keep_background):
         continue
       overlaps, counts = np.unique(snapshot['labels'][mask], return_counts=True)
+      fixed = ~target
+      if protection_policy == 'preserve':
+        fixed = fixed | ((snapshot['protection'] & 1) != 0)
+      fixed_ids = set(snapshot['labels'][fixed])
       choices = [(int(count), int(id_)) for id_, count in zip(overlaps, counts)
-                 if id_ != 0 and int(id_) not in used]
+                 if id_ != 0 and int(id_) not in used and int(id_) not in fixed_ids]
       if choices:
         region_id = max(choices)[1]
         old_region = next(r for r in regions if r['id'] == region_id)
-        default = old_region['defaultLayers']
+        default = old_region['defaultLayers'] if protection_policy == 'preserve' else default_layers
+        old_region.update(color=region['color'], defaultLayers=0 if is_background else default)
+        if protection_policy == 'overwrite':
+          old_region['name'] = region['name']
       else:
         region_id = next((id_ for id_ in range(1, 65536) if id_ not in occupied), None)
         if region_id is None:
           raise ValueError('区域 ID 已耗尽')
         occupied.add(region_id)
-        default = 0 if is_background else 10
+        default = 0 if is_background else default_layers
         regions.append({'id': region_id, 'name': region['name'], 'color': region['color'], 'defaultLayers': default})
       used.add(region_id)
       labels[mask] = region_id
       heights[mask] = 0 if is_background else default
       # 已有打印像素保留局部高度，避免区域默认值吞掉人工或混合高度。
-      existing = mask & (snapshot['labels'] != 0) & (not is_background)
+      existing = mask & (snapshot['labels'] != 0) & (not is_background) & (protection_policy == 'preserve')
       heights[existing] = snapshot['heights'][existing]
-  elif keep_background:
+  elif mode == 'subject' and keep_background:
     # 主体为空仍允许保留已有可见背景；零层不等于不打印。
     keep = target & visible.ravel()
     labels[keep] = snapshot['labels'][keep]
@@ -143,11 +176,11 @@ def recognize(snapshot, selection=None, *, keep_background=False,
   colors.reshape(-1, 4)[target] = rgba.reshape(-1, 4)[target]
   uncertain = target & ((probability.ravel() > .35) & (probability.ravel() < .65))
   if protection_policy == 'preserve':
-    protection = snapshot['protection']
     locked_range = target & ((protection & 1) != 0)
     locked_color = target & ((protection & 2) != 0)
     locked_height = target & ((protection & 4) != 0)
     labels[locked_range] = snapshot['labels'][locked_range]
+    heights[locked_range] = snapshot['heights'][locked_range]
     heights[locked_height] = snapshot['heights'][locked_height]
     colors.reshape(-1, 4)[locked_color] = snapshot['colors'].reshape(-1, 4)[locked_color]
     conflict = target & ((labels == 0) & (heights != 0))
@@ -156,14 +189,19 @@ def recognize(snapshot, selection=None, *, keep_background=False,
     labels[conflict] = snapshot['labels'][conflict]
     heights[conflict] = snapshot['heights'][conflict]
     uncertain |= conflict
-  heights[labels == 0] = 0
-  labels[~visible.ravel()] = 0
-  heights[~visible.ravel()] = 0
-  next_snapshot = dict(snapshot, labels=labels, heights=heights, colors=colors, regions=regions)
+  else:
+    protection[target] = 0
+  heights[target & (labels == 0)] = 0
+  labels[target & ~visible.ravel()] = 0
+  heights[target & ~visible.ravel()] = 0
+  # 恢复人工标签之后再清理区域，保证保留的 ID 始终有对应元数据。
+  live_ids = set(labels)
+  regions = [region for region in regions if region['id'] in live_ids]
+  next_snapshot = dict(snapshot, labels=labels, heights=heights, colors=colors, protection=protection, regions=regions)
   count, ids = _metadata(next_snapshot)
   _pixels(next_snapshot, count, ids)
   check_cancel(cancelled)
-  output = patch(snapshot, {'labels': labels, 'heights': heights, 'colors': colors}, '自动识别')
+  output = patch(snapshot, {'labels': labels, 'heights': heights, 'colors': colors, 'protection': protection}, '重新识别区域')
   if regions != snapshot['regions']:
     keys = ('regions', 'name', 'sizeMm', 'device', 'heightMapping')
     output['properties'] = {'before': {k: copy.deepcopy(snapshot[k]) for k in keys},

@@ -8,6 +8,99 @@ from recognition_ops import recognize, import_snapshot
 
 
 class RecognitionTests(unittest.TestCase):
+  def test_color_background_exclusion_is_consistent_when_all_pixels_are_excluded(self):
+    value = fixture()
+    for excluded_count in (32, 64):
+      with self.subTest(excluded_count=excluded_count):
+        excluded = np.zeros(64, 'uint8')
+        excluded[:excluded_count] = 1
+        result = applied(value, recognize(value, mode='color', keep_background=True,
+                                          excluded_mask=excluded))
+        self.assertTrue(np.all(result['labels'][:excluded_count] == 0))
+        self.assertTrue(np.all(result['heights'][:excluded_count] == 0))
+        self.assertTrue(np.all(result['labels'][excluded_count:] != 0))
+
+  def test_preserve_keeps_manual_region_name_when_reusing_region_id(self):
+    value = fixture()
+    value['regions'][0]['name'] = '白色立体文字'
+    result = applied(value, recognize(value, mode='color'))
+    self.assertEqual(result['regions'][0]['id'], 1)
+    self.assertEqual(result['regions'][0]['name'], '白色立体文字')
+
+  def test_v2_explicit_subject_retains_opt_in_material_shade_merge(self):
+    value = fixture(16, 16)
+    rgba = value['original'].reshape(16, 16, 4)
+    rgba[:, :8, :3] = [210, 160, 70]
+    rgba[:, 8:, :3] = [120, 90, 38]
+    value['colors'][:] = value['original']
+    mask = np.ones(256, 'uint8')
+    for options, expected in (({}, 2), ({'merge_material_shades': True}, 1),
+                              ({'merge_material_shades': False}, 2)):
+      with self.subTest(options=options):
+        result = applied(value, recognize(value, subject_mask=mask, **options))
+        self.assertEqual(len(set(result['labels'])), expected)
+        np.testing.assert_array_equal(result['colors'], value['original'])
+        np.testing.assert_array_equal(result['heights'], value['heights'])
+
+  def test_color_reanalysis_uses_original_preserves_manual_pixels_and_local_scope(self):
+    value = fixture(32, 16)
+    rgba = value['original'].reshape(16, 32, 4)
+    rgba[:, :16, :3] = [210, 30, 20]
+    rgba[:, 16:, :3] = [20, 40, 220]
+    value['colors'][:] = value['original']
+    value['colors'][4:8] = [10, 240, 10, 255]
+    value['protection'][1] = 2
+    value['labels'][2] = value['heights'][2] = 0
+    value['protection'][2] = 5
+    value['heights'][3] = 47
+    value['protection'][3] = 4
+    selection = np.zeros(512, 'uint8')
+    selection.reshape(16, 32)[:, :16] = 1
+    candidate = recognize(value, selection, mode='color')
+    result = applied(value, candidate)
+    for field in ('labels', 'heights', 'protection'):
+      np.testing.assert_array_equal(result[field][selection == 0], value[field][selection == 0])
+    np.testing.assert_array_equal(result['colors'].reshape(-1, 4)[selection == 0],
+                                  value['colors'].reshape(-1, 4)[selection == 0])
+    self.assertEqual(result['labels'][2], 0)
+    self.assertEqual(result['heights'][3], 47)
+    np.testing.assert_array_equal(result['colors'][4:8], [10, 240, 10, 255])
+    np.testing.assert_array_equal(result['protection'], value['protection'])
+    selected_region = next(r for r in result['regions'] if r['id'] == result['labels'][1])
+    self.assertEqual(selected_region['color'], '#d21e14')
+    self.assertEqual(candidate['diagnostics']['source'], 'original-color')
+    _pixels(result, *_metadata(result))
+
+  def test_overwrite_recalculates_selected_heights_and_releases_only_selected_protection(self):
+    value = fixture()
+    value['heights'][0] = 47
+    value['protection'][:] = 7
+    value['colors'][:4] = [20, 30, 40, 255]
+    selection = np.zeros(64, 'uint8')
+    selection[:16] = 1
+    result = applied(value, recognize(value, selection, mode='color',
+                                      protection_policy='overwrite', default_layers=6))
+    self.assertTrue(np.all(result['heights'][:16] == 6))
+    self.assertTrue(np.all(result['protection'][:16] == 0))
+    np.testing.assert_array_equal(result['protection'][16:], value['protection'][16:])
+    np.testing.assert_array_equal(result['colors'][:4], value['original'][:4])
+
+  def test_explicit_subject_mask_and_background_exclusion_honor_range_protection(self):
+    value = fixture(16, 16)
+    mask = np.zeros(256, 'uint8')
+    mask[32:224] = 1
+    value['protection'][0] = 1
+    result = applied(value, recognize(value, subject_mask=mask, default_layers=9,
+                                      predictor=lambda _: self.fail('显式主体不需要模型')))
+    self.assertEqual(result['labels'][0], 1)
+    self.assertEqual(result['heights'][0], 12)
+    self.assertEqual(result['labels'][1], 0)
+    excluded = np.zeros(256, 'uint8')
+    excluded[:32] = 1
+    result = applied(value, recognize(value, mode='color', excluded_mask=excluded))
+    self.assertEqual(result['labels'][0], 1)
+    self.assertEqual(result['labels'][1], 0)
+
   def test_transparency_holes_and_same_color_disconnected_text(self):
     value = fixture(12, 12)
     rgba = value['original'].reshape(12, 12, 4)

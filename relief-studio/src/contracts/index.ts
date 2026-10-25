@@ -55,7 +55,9 @@ export type HeightOperation =
   | { kind: 'add'; delta: number }
   | { kind: 'scale'; factor: number }
   | { kind: 'suggest'; maxLayers: number }
-  | { kind: 'bevel' | 'smooth'; radiusPx: number };
+  | { kind: 'bevel'; radiusPx: number; widthMm?: never }
+  | { kind: 'bevel'; widthMm: number; radiusPx?: never }
+  | { kind: 'smooth'; radiusPx: number }; // 兼容已有协议字段名；平滑时表示迭代次数。
 export interface HeightRequest {
   snapshot: ProjectSnapshot;
   selection?: SelectionMask; // 省略为全图；全零为无选中像素
@@ -66,6 +68,13 @@ export interface RecognitionRequest {
   selection?: SelectionMask;
   keepBackground: boolean;
   protectionPolicy: 'preserve' | 'overwrite';
+  mode?: 'color' | 'subject';
+  colorCount?: number;
+  tolerance?: number;
+  mergeMaterialShades?: boolean;
+  defaultLayers?: number;
+  subjectMask?: SelectionMask;
+  excludedMask?: SelectionMask;
   prompt?: { points?: { x: number; y: number; label: 0 | 1 }[];
     box?: [number, number, number, number] };
 }
