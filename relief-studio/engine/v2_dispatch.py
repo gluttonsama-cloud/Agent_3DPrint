@@ -48,9 +48,25 @@ def execute_v2(job):
         value = run_height(snapshot, payload['operation'], selection, cancelled=cancelled)
       elif action == 'recognition':
         from recognition_ops import recognize
+        def recognition_mask(key):
+          mask = payload.get(key)
+          if mask is None:
+            return None
+          if mask['width'] != snapshot['width'] or mask['height'] != snapshot['height']:
+            raise ValueError('识别蒙版尺寸不一致')
+          value = decode_raster(mask['data'], 'uint8', snapshot['width'] * snapshot['height'])
+          if (value > 1).any():
+            raise ValueError('识别蒙版仅允许 0/1')
+          return value
         value = recognize(snapshot, selection, keep_background=payload.get('keepBackground', False),
                           protection_policy=payload.get('protectionPolicy', 'preserve'),
                           prompt=payload.get('prompt'),
+                          mode=payload.get('mode', 'subject'), color_count=payload.get('colorCount'),
+                          tolerance=payload.get('tolerance', 12),
+                          merge_material_shades=payload.get('mergeMaterialShades', False),
+                          default_layers=payload.get('defaultLayers'),
+                          subject_mask=recognition_mask('subjectMask'),
+                          excluded_mask=recognition_mask('excludedMask'),
                           cancelled=cancelled)
       elif action == 'export':
         from export_layers import export_bundle

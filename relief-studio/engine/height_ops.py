@@ -44,7 +44,63 @@ def number(operation, key, low, high, integer=False):
   return value
 
 
-def bevel_heights(source, labels, target, radius, cancelled):
+def physical_distance(features, spacing, cancelled):
+  """到低面像素中心的精确欧氏距离；两轴独立计量，逐列并行构建抛物线下包络。"""
+  dy, dx = spacing
+  check_cancel(cancelled)
+  if dx == dy:
+    # 等间距使用 OpenCV 精确 L2（非 3/5 邻域近似），降低嵌套台面的重复计算成本。
+    distance = cv2.distanceTransform((~features).astype('uint8'), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
+    check_cancel(cancelled)
+    return distance.astype('float64')*dx
+  height, width = features.shape
+  scale = max(dx, dy)
+  dx, dy = dx/scale, dy/scale
+  if min(dx, dy)**2 == 0:
+    raise ValueError('sizeMm: 两轴比例超出距离计算精度')
+  columns = np.arange(width)
+  left = np.maximum.accumulate(np.where(features, columns, -width), axis=1)
+  right = np.minimum.accumulate(np.where(features, columns, 2*width)[:, ::-1], axis=1)[:, ::-1]
+  horizontal = (np.minimum(columns-left, right-columns)*dx)**2
+  horizontal[~features.any(axis=1)] = (width*dx)**2+(height*dy)**2+1
+  # 各列一维平方距离变换：每个抛物线最多入栈、出栈一次，避免全点两两比较。
+  sites = np.zeros((height, width), dtype='int32')
+  breaks = np.full((height+1, width), np.inf)
+  breaks[0] = -np.inf
+  last = np.zeros(width, dtype='int32')
+  weight = dy*dy
+  for row in range(1, height):
+    if row % 64 == 0:
+      check_cancel(cancelled)
+    previous = sites[last, columns]
+    crossing = ((horizontal[row]-horizontal[previous, columns]) /
+                (2*weight*(row-previous))+(row+previous)/2)
+    retreat = crossing <= breaks[last, columns]
+    while retreat.any():
+      last[retreat] -= 1
+      previous = sites[last, columns]
+      crossing = ((horizontal[row]-horizontal[previous, columns]) /
+                  (2*weight*(row-previous))+(row+previous)/2)
+      retreat = crossing <= breaks[last, columns]
+    last += 1
+    sites[last, columns] = row
+    breaks[last, columns] = crossing
+    breaks[last+1, columns] = np.inf
+  last[:] = 0
+  distance = np.empty_like(horizontal)
+  for row in range(height):
+    if row % 64 == 0:
+      check_cancel(cancelled)
+    advance = breaks[last+1, columns] < row
+    while advance.any():
+      last[advance] += 1
+      advance = breaks[last+1, columns] < row
+    nearest = sites[last, columns]
+    distance[row] = np.sqrt(weight*(row-nearest)**2+horizontal[nearest, columns])*scale
+  return distance
+
+
+def bevel_heights(source, labels, target, radius, cancelled, spacing=None):
   result = source.astype('float64')
   if not target.any():
     return result
@@ -70,7 +126,18 @@ def bevel_heights(source, labels, target, radius, cancelled):
     _, _, _, (left, top, width, height) = cv2.floodFill(visited, flood_mask, (x, y), marker, flags=4)
     area = np.s_[top-1:top+height+1, left-1:left+width+1]
     plateau = visited[area] == marker
-    mask = plateau & writable[area]
+    # 洪泛会纳入与台面相连的一像素细尾、窄桥；以完整 2×2 台面作为局部支撑。
+    squares = plateau[:-1, :-1] & plateau[:-1, 1:] & plateau[1:, :-1] & plateau[1:, 1:]
+    supported = np.zeros_like(plateau)
+    supported[:-1, :-1] |= squares
+    supported[:-1, 1:] |= squares
+    supported[1:, :-1] |= squares
+    supported[1:, 1:] |= squares
+    neighbors = cv2.filter2D(plateau.astype('uint8'), -1, cross, borderType=cv2.BORDER_CONSTANT)-plateau
+    adjacent = cv2.dilate(supported.astype('uint8'), cross) != 0
+    # 圆/菱形的单像素帽尖随台面倒角，避免留下高针；长细尾内点、远端及窄桥保持原高。
+    supported |= plateau & (neighbors == 1) & adjacent
+    mask = supported & writable[area]
     if not mask.any():
       continue
     outline = (cv2.dilate(plateau.astype('uint8'), cross) != 0) & ~plateau
@@ -79,8 +146,9 @@ def bevel_heights(source, labels, target, radius, cancelled):
       continue
     # 同一台面统一朝最高邻接低面倒角，避免不同底面的最近点切换制造新陡壁。
     base = int(surface[area][lower].max())
-    distance = cv2.distanceTransform((~lower).astype('uint8'), cv2.DIST_L2, 5)
-    factor = np.minimum(1, distance/radius)
+    distance = (cv2.distanceTransform((~lower).astype('uint8'), cv2.DIST_L2, 5)
+                if spacing is None else physical_distance(lower, spacing, cancelled))
+    factor = np.minimum(distance, radius)/radius
     output[area][mask] = np.maximum(1, base+(level-base)*factor[mask])
   return output[1:-1, 1:-1]
 
@@ -157,10 +225,23 @@ def run_height(snapshot, operation, selection=None, cancelled=lambda: False):
     change = target & (suggested >= 0)
     values[change] = np.minimum(maximum, suggested[change])
   else:
-    radius = number(operation, 'radiusPx', 1, 128, True)
+    spacing = None
+    if kind == 'bevel' and 'widthMm' in operation:
+      if 'radiusPx' in operation:
+        raise ValueError('倒角宽度只能选择 widthMm 或 radiusPx')
+      radius = number(operation, 'widthMm', 0, math.inf)
+      if radius == 0:
+        raise ValueError('widthMm: 必须大于零')
+      spacing = (snapshot['sizeMm'][1]/shape[0], snapshot['sizeMm'][0]/shape[1])
+      if min(spacing) <= 0:
+        raise ValueError('sizeMm: 尺寸超出距离计算精度')
+    else:
+      if 'widthMm' in operation:
+        raise ValueError('widthMm: 仅支持倒角')
+      radius = number(operation, 'radiusPx', 1, 128, True)
     if kind == 'bevel':
       values = bevel_heights(snapshot['heights'].reshape(shape), labels,
-                            target.reshape(shape), radius, cancelled).ravel()
+                            target.reshape(shape), radius, cancelled, spacing).ravel()
     for region_id in np.unique(labels) if kind == 'smooth' else ():
       if region_id == 0:
         continue

@@ -49,14 +49,35 @@ describe('smart color selection', () => {
     expect(result.every((i) => i % 7 < 3)).toBe(true);
   });
 
-  it('uses the surrounding color for an isolated noisy seed but preserves a thin stroke', () => {
+  it('respects an isolated clicked color and preserves a thin stroke', () => {
     const noisy = makeImage(7, 7, (x, y) =>
       x === 3 && y === 3 ? [235, 12, 190, 255] : [75, 130, 180, 255],
     );
-    expect(smartSelect(noisy, [3, 3], 24)).toHaveLength(49);
+    expect(smartSelect(noisy, [3, 3], 24)).toEqual([24]);
 
     const thin = makeImage(7, 7, (x) => (x === 3 ? [235, 12, 190, 255] : [75, 130, 180, 255]));
     expect(smartSelect(thin, [3, 3], 24)).toHaveLength(7);
+  });
+
+  it('selects a one-pixel punctuation mark without swallowing its background', () => {
+    const image = makeImage(5, 5, (x, y) =>
+      x === 2 && y === 2 ? [0, 0, 0, 255] : [255, 255, 255, 255],
+    );
+    expect(smartSelect(image, [2, 2], 24)).toEqual([12]);
+    const background = smartSelect(image, [1, 2], 24);
+    expect(background).toHaveLength(24);
+    expect(background).not.toContain(12);
+  });
+
+  it('preserves an isolated translucent detail inside the allowed region', () => {
+    const image = makeImage(5, 5, (x, y) =>
+      x === 2 && y === 2 ? [230, 20, 180, 128] : [40, 100, 180, 128],
+    );
+    const allowed = new Uint8Array(25).fill(1);
+    allowed[0] = 0;
+    expect(smartSelect(image, [2, 2], 24, allowed)).toEqual([12]);
+    allowed[12] = 0;
+    expect(smartSelect(image, [2, 2], 24, allowed)).toEqual([]);
   });
 
   it('stops a gradual color ramp at the seed-relative tolerance', () => {

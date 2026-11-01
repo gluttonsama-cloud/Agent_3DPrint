@@ -3,7 +3,10 @@ import type { HeightOperation, HeightPanelProps } from '../contracts';
 
 export function HeightPanel({ snapshot, selection, busy, onPreview, onRequest, onCancel }: HeightPanelProps) {
   const [layers, setLayers] = useState(10);
-  const [radius, setRadius] = useState(2);
+  const [bevelUnit, setBevelUnit] = useState<'mm' | 'px'>('mm');
+  const [bevelMm, setBevelMm] = useState(0.5);
+  const [bevelPixels, setBevelPixels] = useState(2);
+  const [smoothIterations, setSmoothIterations] = useState(2);
   const [factor, setFactor] = useState(1);
   const [mode, setMode] = useState<'uniform' | 'suggest'>('uniform');
   const [error, setError] = useState('');
@@ -28,6 +31,9 @@ export function HeightPanel({ snapshot, selection, busy, onPreview, onRequest, o
   });
   }, [snapshot.labels, snapshot.heights, snapshot.regions]);
   const validLayers = Number.isInteger(layers) && layers >= 0 && layers <= 256;
+  const bevelWidth = bevelUnit === 'mm' ? bevelMm : bevelPixels;
+  const validBevel = Number.isFinite(bevelWidth) && bevelWidth > 0 &&
+    (bevelUnit === 'mm' || (Number.isInteger(bevelWidth) && bevelWidth <= 128));
   const scope = selection ? `选中 ${selection.data.reduce((sum, value) => sum + (value ? 1 : 0), 0).toLocaleString()} 像素` : '全部打印区域';
   return <section className="height-panel" aria-label="高度面板">
     <div className="height-scope"><span>作用范围</span><strong>{scope}</strong></div>
@@ -59,14 +65,24 @@ export function HeightPanel({ snapshot, selection, busy, onPreview, onRequest, o
       <label className="stack-field">整体比例<input type="number" min={0} max={256} step={0.1} value={factor} disabled={busy}
         onChange={e => setFactor(Number(e.target.value))} /></label>
       <button className="full-button" disabled={busy || !Number.isFinite(factor) || factor < 0} onClick={() => request({ kind: 'scale', factor })}>应用比例</button>
-      <label className="stack-field">处理半径（像素）<input type="number" min={1} max={64} value={radius} disabled={busy}
-        onChange={e => setRadius(Number(e.target.value))} /></label>
-      <div className="height-actions">
-        <button disabled={busy || !Number.isInteger(radius) || radius < 1 || radius > 64}
-          onClick={() => request({ kind: 'bevel', radiusPx: radius })}>内部倒角</button>
-        <button disabled={busy || !Number.isInteger(radius) || radius < 1 || radius > 64}
-          onClick={() => request({ kind: 'smooth', radiusPx: radius })}>区域平滑</button>
-      </div>
+      <label className="stack-field">倒角单位<select aria-label="倒角单位" value={bevelUnit} disabled={busy}
+        onChange={e => setBevelUnit(e.target.value as 'mm' | 'px')}>
+        <option value="mm">毫米（按设计尺寸）</option><option value="px">像素（兼容）</option>
+      </select></label>
+      <label className="stack-field">倒角宽度（{bevelUnit === 'mm' ? 'mm' : '像素'}）<input type="number"
+        min={bevelUnit === 'mm' ? 0 : 1} max={bevelUnit === 'mm' ? undefined : 128} step={bevelUnit === 'mm' ? 'any' : 1}
+        value={Number.isFinite(bevelWidth) ? bevelWidth : ''} disabled={busy}
+        onChange={e => (bevelUnit === 'mm' ? setBevelMm : setBevelPixels)(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+      <p className="height-note">毫米宽度依据工程设计尺寸 {snapshot.sizeMm[0]} × {snapshot.sizeMm[1]} mm，横纵像素分别换算。修改尺寸后请重新倒角。</p>
+      <button className="full-button" disabled={busy || !validBevel}
+        onClick={() => request(bevelUnit === 'mm' ? { kind: 'bevel', widthMm: bevelMm }
+          : { kind: 'bevel', radiusPx: bevelPixels })}>内部倒角</button>
+      <label className="stack-field">平滑次数<input type="number" min={1} max={64}
+        value={Number.isFinite(smoothIterations) ? smoothIterations : ''} disabled={busy}
+        onChange={e => setSmoothIterations(e.target.value === '' ? NaN : Number(e.target.value))} /></label>
+      <button className="full-button" disabled={busy || !Number.isInteger(smoothIterations) || smoothIterations < 1 || smoothIterations > 64}
+        onClick={() => request({ kind: 'smooth', radiusPx: smoothIterations })}>区域平滑</button>
+      <p className="height-note">倒角沿高度台阶向内过渡；平滑次数越多，区域内部高度变化越缓。</p>
     </details>
     <details className="height-advanced"><summary>区域高度明细</summary>
       <ul className="height-summary">{summary.map((line, i) => <li key={snapshot.regions[i].id}>{line}</li>)}</ul>

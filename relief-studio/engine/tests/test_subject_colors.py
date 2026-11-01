@@ -24,7 +24,8 @@ class SubjectColorTests(unittest.TestCase):
     valid[:, 0] = 0
     rgba[5, 5, 3] = 0
     result = segment({'image': data_url(rgba), 'subjectMask': mask.ravel().tolist(),
-                      'validMask': valid.ravel().tolist(), 'subjectLayers': 7})
+                      'validMask': valid.ravel().tolist(), 'subjectLayers': 7,
+                      'mergeMaterialShades': True})
     labels = np.array(result['labels']).reshape(mask.shape)
     self.assertEqual(len(result['regions']), 5)
     self.assertEqual(len({labels[10, x] for x in (8, 16, 24)} | {labels[8, 8]}), 4)
@@ -39,13 +40,47 @@ class SubjectColorTests(unittest.TestCase):
       layers = sum(np.array(Image.open(p)) > 0 for p in (output/'layers').glob('*.png'))
       np.testing.assert_array_equal(layers, expected.astype(int)*7)
 
+  def test_distinct_same_hue_shades_stay_separate_unless_explicitly_merged(self):
+    for light, dark in (([180, 30, 30], [80, 10, 10]),
+                        ([210, 160, 70], [120, 90, 38])):
+      rgba = np.full((16, 16, 4), 255, dtype=np.uint8)
+      rgba[:, :8, :3] = light
+      rgba[:, 8:, :3] = dark
+      job = {'image': data_url(rgba), 'subjectMask': [1]*256, 'subjectLayers': 7}
+      for options, expected_count in (({}, 2), ({'mergeMaterialShades': False}, 2),
+                                      ({'mergeMaterialShades': True}, 1)):
+        with self.subTest(light=light, options=options):
+          result = segment({**job, **options})
+          self.assertEqual(len(result['regions']), expected_count)
+          self.assertEqual(result['labels'][0] == result['labels'][15], expected_count == 1)
+          self.assertTrue(all(label > 1 for label in result['labels']))
+          self.assertTrue(all(region['layers'] == 7 for region in result['regions']))
+          np.testing.assert_array_equal(decode_image(result['image']), rgba)
+
+  def test_manual_color_count_is_not_overridden_by_material_merge(self):
+    rgba = np.full((16, 16, 4), [180, 30, 30, 255], dtype=np.uint8)
+    rgba[:, 8:, :3] = [80, 10, 10]
+    result = segment({'image': data_url(rgba), 'subjectMask': [1]*256,
+                      'colors': 2, 'mergeMaterialShades': True})
+    self.assertEqual(len(result['regions']), 2)
+    self.assertNotEqual(result['labels'][0], result['labels'][15])
+
+  def test_material_merge_option_requires_a_boolean(self):
+    image = data_url(np.full((8, 8, 4), 255, dtype=np.uint8))
+    for value in (0, 1, 'false', None, []):
+      with self.subTest(value=value), self.assertRaises(ValueError):
+        segment({'image': image, 'subjectMask': [1]*64, 'mergeMaterialShades': value})
+
   def test_achromatic_black_gray_white_are_not_merged(self):
     rgba = np.full((12, 30, 4), 255, dtype=np.uint8)
     for start, value in ((0, 10), (10, 120), (20, 245)):
       rgba[:, start:start+10, :3] = value
-    result = segment({'image': data_url(rgba), 'subjectMask': [1]*360})
-    self.assertEqual(len(result['regions']), 3)
-    self.assertNotIn(1, result['labels'])
+    for merge_shades in (False, True):
+      with self.subTest(merge_shades=merge_shades):
+        result = segment({'image': data_url(rgba), 'subjectMask': [1]*360,
+                          'mergeMaterialShades': merge_shades})
+        self.assertEqual(len(result['regions']), 3)
+        self.assertNotIn(1, result['labels'])
 
   def test_invalid_and_empty_subject_rejected(self):
     image = data_url(np.full((8, 8, 4), 255, dtype=np.uint8))
@@ -59,6 +94,9 @@ class SubjectColorTests(unittest.TestCase):
     rgba = np.full((16, 32, 4), 255, dtype=np.uint8)
     rgba[:, :16, :3] = [245, 234, 210]
     rgba[:, 16:, :3] = [210, 160, 70]
-    result = segment({'image': data_url(rgba), 'subjectMask': [1]*512})
-    self.assertEqual(len(result['regions']), 2)
-    self.assertNotEqual(result['labels'][0], result['labels'][31])
+    for merge_shades in (False, True):
+      with self.subTest(merge_shades=merge_shades):
+        result = segment({'image': data_url(rgba), 'subjectMask': [1]*512,
+                          'mergeMaterialShades': merge_shades})
+        self.assertEqual(len(result['regions']), 2)
+        self.assertNotEqual(result['labels'][0], result['labels'][31])
