@@ -22,7 +22,7 @@ function inspect(directory) {
     if (stat.isSymbolicLink()) continue;
     if (stat.isDirectory()) inspect(filename);
     else if (run('/usr/bin/file', ['-b', filename]).includes('Mach-O')) {
-      run('/usr/bin/lipo', ['-verify_arch', 'arm64', filename]);
+      run('/usr/bin/lipo', [filename, '-verify_arch', 'arm64']);
       binaries++;
     }
   }
