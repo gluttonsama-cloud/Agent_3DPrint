@@ -63,9 +63,17 @@ export function createCapabilityService(native: NativeV2, onProgress?: (value: P
         ...request.selection, data: encodeRaster(request.selection.data),
       } } : {}) };
   }
+  function recognitionInput(request: RecognitionRequest) {
+    const payload = input(request);
+    return { ...payload,
+      ...(request.subjectMask ? { subjectMask: { ...request.subjectMask,
+        data: encodeRaster(request.subjectMask.data) } } : {}),
+      ...(request.excludedMask ? { excludedMask: { ...request.excludedMask,
+        data: encodeRaster(request.excludedMask.data) } } : {}) };
+  }
   const service: CapabilityService = {
     height: (request, signal) => call('height', input(request), decodePatch, signal),
-    recognition: (request, signal) => call('recognition', input(request), decodePatch, signal),
+    recognition: (request, signal) => call('recognition', recognitionInput(request), decodePatch, signal),
     export: (request, signal) => call('export', input(request), value => value as ExportResult, signal),
   };
   return { ...service,

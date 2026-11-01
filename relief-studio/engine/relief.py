@@ -109,6 +109,9 @@ def segment(job):
   tolerance = job.get('tolerance', 12)
   if type(tolerance) not in (int, float) or not math.isfinite(tolerance) or not 1 <= tolerance <= 50:
     raise ValueError('颜色容差必须为 1 至 50')
+  merge_shades = job.get('mergeMaterialShades', False)
+  if type(merge_shades) is not bool:
+    raise ValueError('合并同色系明暗必须为布尔值')
   size = job.get('sizeMm', [55, 55])
   physical_size(size)
   visible = rgba[:, :, 3] > 0
@@ -134,7 +137,8 @@ def segment(job):
   spread = cv2.dilate(partition_rgb, kernel).astype(np.int16)-cv2.erode(partition_rgb, kernel)
   interior = (spread.max(axis=2) <= 12)[visible]
   flat_labels, centers = partition(rgb, colors, tolerance, interior)
-  if subject is not None and colors is None:
+  # 默认保留可分别设高的明暗色区；反光材质的同色系合并由用户明确开启。
+  if subject is not None and colors is None and merge_shades:
     flat_labels, centers = merge_material_shades(flat_labels, centers)
   labels = np.zeros(visible.shape, dtype=np.uint16)
   labels[visible] = flat_labels

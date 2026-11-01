@@ -17,55 +17,6 @@ function colorDistance(rgba: Uint8ClampedArray, a: number, b: number): number {
   return 0.3 * dr * dr + 0.59 * dg * dg + 0.11 * db * db;
 }
 
-function referencePixel(
-  rgba: Uint8ClampedArray,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-  tolerance: number,
-  allowed?: Uint8Array,
-): number {
-  const origin = y * width + x;
-  const seedByte = origin * 4;
-  const neighbors: number[] = [];
-  for (let ny = Math.max(0, y - 1); ny <= Math.min(height - 1, y + 1); ny++) {
-    for (let nx = Math.max(0, x - 1); nx <= Math.min(width - 1, x + 1); nx++) {
-      const index = ny * width + nx;
-      if (index === origin || (allowed && !allowed[index])) continue;
-      const byte = index * 4;
-      if (
-        rgba[byte + 3] === 0 ||
-        Math.abs(rgba[byte + 3] - rgba[seedByte + 3]) > Math.max(12, tolerance * 2)
-      ) {
-        continue;
-      }
-      neighbors.push(byte);
-    }
-  }
-  if (neighbors.length < 5) return seedByte;
-  const clusterLimit = Math.max(8, Math.min(24, tolerance)) ** 2;
-  let seedMatches = 0;
-  for (const byte of neighbors) {
-    if (colorDistance(rgba, seedByte, byte) <= clusterLimit) seedMatches++;
-  }
-  // 有任何相似邻居时保持细线/文字的点击颜色；仅修正孤立噪点。
-  if (seedMatches > 0) return seedByte;
-  let best = seedByte;
-  let bestMatches = 0;
-  for (const candidate of neighbors) {
-    let matches = 0;
-    for (const other of neighbors) {
-      if (colorDistance(rgba, candidate, other) <= clusterLimit) matches++;
-    }
-    if (matches > bestMatches) {
-      bestMatches = matches;
-      best = candidate;
-    }
-  }
-  return bestMatches >= 5 ? best : seedByte;
-}
-
 export function buildSelectionImage(
   rgba: Uint8ClampedArray,
   width: number,
@@ -117,7 +68,8 @@ export function smartSelect(
   const limit = Number.isFinite(tolerance) ? Math.max(1, Math.min(80, tolerance)) : 24;
   const limitSquared = limit * limit;
   const alphaLimit = Math.max(12, limit * 2);
-  const seedByte = referencePixel(rgba, width, height, x, y, limit, allowed);
+  // 孤立像素可能是标点或图案细节；明确落点的颜色不能由周围多数色替代。
+  const seedByte = origin * 4;
   const seedAlpha = rgba[origin * 4 + 3];
   const seen = new Uint8Array(size);
   const queue = new Int32Array(size);

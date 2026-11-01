@@ -10,7 +10,7 @@ module.exports = {
     { from: 'samples', to: 'samples' },
     { from: 'licenses', to: 'licenses' },
   ],
-  artifactName: 'Relief-Studio-${version}-mac-trial-${arch}.${ext}',
+  artifactName: 'Relief-Studio-${version}-integrated-80392e2-${arch}.${ext}',
   mac: {
     target: [{ target: 'dmg', arch: ['arm64'] }],
     category: 'public.app-category.graphics-design',

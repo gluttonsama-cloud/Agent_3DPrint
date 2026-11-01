@@ -1,8 +1,8 @@
-name: Relief Studio Mac arm64 trial
+name: Relief Studio integrated desktop trials
 on:
   workflow_dispatch:
   push:
-    branches: [cys/selection-repair]
+    branches: [cys/selection-repair, cys/m5-latest-integration]
     paths: ['relief-studio/**', '.github/workflows/relief-macos-trial.yml']
 permissions:
   contents: read
@@ -42,15 +42,15 @@ jobs:
       - name: Exercise packaged desktop and native save
         run: |
           mkdir -p artifacts
-          npm run test:e2e -- tests/tool-groups.spec.ts tests/handable.spec.ts tests/workbench.spec.ts tests/lasso.spec.ts
+          npm run test:e2e -- tests/tool-groups.spec.ts tests/handable.spec.ts tests/workbench.spec.ts tests/lasso.spec.ts tests/recognition-protection.spec.ts tests/bevel-mm.spec.ts tests/height-edges.spec.ts tests/subject-colors.spec.ts
         env:
           RELIEF_TEST_PACKAGED: '1'
           RELIEF_TEST_EXECUTABLE: ${{ github.workspace }}/relief-studio/release/mac-trial/mac-arm64/Relief Studio.app/Contents/MacOS/Relief Studio
       - name: Record checksums
-        run: shasum -a 256 release/mac-trial/*.dmg > release/mac-trial/SHA256SUMS.txt
+        run: shasum -a 256 release/mac-trial/*.dmg | tee release/mac-trial/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: Relief-Studio-mac-arm64-trial
+          name: Relief-Studio-integrated-mac-arm64
           path: |
             relief-studio/release/mac-trial/*.dmg
             relief-studio/release/mac-trial/SHA256SUMS.txt
@@ -60,6 +60,76 @@ jobs:
         if: failure()
         with:
           name: mac-trial-test-diagnostics
+          path: |
+            relief-studio/artifacts/e2e-results.json
+            relief-studio/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  windows-x64:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: relief-studio
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Install Windows x64 dependencies
+        run: |
+          npm ci
+          python -m venv .venv
+          .venv/Scripts/python.exe -m pip install -r engine/requirements.txt
+      - name: Test source
+        run: |
+          npm test
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run test:ipc
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run test:engine
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Build and inspect Windows installer
+        run: node scripts/build-windows-trial.cjs
+      - name: Install and exercise native desktop
+        run: |
+          $installer = Get-ChildItem release/*-integrated-80392e2-x64-Setup.exe
+          if (@($installer).Count -ne 1) { throw "Expected one x64 installer" }
+          $signature = Get-AuthenticodeSignature $installer.FullName
+          Write-Host "Installer Authenticode status: $($signature.Status)"
+          $destination = Join-Path $env:RUNNER_TEMP 'ReliefTrial'
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$destination" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          $env:RELIEF_TEST_PACKAGED = '1'
+          $env:RELIEF_TEST_EXECUTABLE = Join-Path $destination 'Relief Studio.exe'
+          if (!(Test-Path $env:RELIEF_TEST_EXECUTABLE)) { throw "Installed executable missing" }
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          npm run test:e2e -- tests/tool-groups.spec.ts tests/handable.spec.ts tests/workbench.spec.ts tests/lasso.spec.ts tests/recognition-protection.spec.ts tests/bevel-mm.spec.ts tests/height-edges.spec.ts tests/subject-colors.spec.ts
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Record checksums
+        run: |
+          $files = Get-ChildItem release/*-integrated-80392e2-x64-Setup.exe
+          $lines = $files | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" }
+          $lines | Tee-Object -FilePath release/SHA256SUMS-Windows.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Relief-Studio-integrated-windows-x64
+          path: |
+            relief-studio/release/*-integrated-80392e2-x64-Setup.exe
+            relief-studio/release/SHA256SUMS-Windows.txt
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: windows-trial-test-diagnostics
           path: |
             relief-studio/artifacts/e2e-results.json
             relief-studio/test-results/**

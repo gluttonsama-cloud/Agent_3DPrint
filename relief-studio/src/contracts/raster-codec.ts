@@ -5,17 +5,18 @@ export function encodeRaster(array: Uint8Array | Uint16Array): EncodedRaster {
     throw new Error('unsupported raster type');
   }
   if (array.byteLength > LIMITS.fileBytes) throw new Error('raster too large');
-  const bytes = new Uint8Array(array.byteLength);
-  const view = new DataView(bytes.buffer);
-  array.forEach((value, index) => {
-    if (array instanceof Uint16Array) view.setUint16(index * 2, value, true);
-    else bytes[index] = value;
-  });
+  const words = array instanceof Uint16Array;
+  // 8 位栅格直接读取当前视图；16 位逐值写小端，不能暴露子视图以外的数据。
+  const bytes = words ? new Uint8Array(array.byteLength) : array;
+  if (words) {
+    const view = new DataView(bytes.buffer);
+    for (let i = 0; i < array.length; i++) view.setUint16(i * 2, array[i], true);
+  }
   let binary = '';
   for (let i = 0; i < bytes.length; i += 8192) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
   }
-  return { type: array instanceof Uint16Array ? 'uint16' : 'uint8',
+  return { type: words ? 'uint16' : 'uint8',
     encoding: 'base64-le', data: btoa(binary) };
 }
 
@@ -38,8 +39,12 @@ export function decodeRaster(value: unknown, count: number): Uint8Array | Uint16
   if (binary.length !== byteCount || btoa(binary) !== raster.data) {
     throw new Error('noncanonical base64 or raster length');
   }
-  const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+  // 避免字符串 iterable 映射创建逐字符临时集合，大图直接写预分配栅格。
+  const bytes = new Uint8Array(byteCount);
+  for (let i = 0; i < byteCount; i++) bytes[i] = binary.charCodeAt(i);
   if (raster.type === 'uint8') return bytes;
   const view = new DataView(bytes.buffer);
-  return Uint16Array.from({ length: count }, (_, i) => view.getUint16(i * 2, true));
+  const words = new Uint16Array(count);
+  for (let i = 0; i < count; i++) words[i] = view.getUint16(i * 2, true);
+  return words;
 }

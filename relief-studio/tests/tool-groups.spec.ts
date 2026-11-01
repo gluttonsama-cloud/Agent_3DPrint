@@ -316,6 +316,21 @@ test('智能跨区追加减去，清除后直接框选补回并原生保存重�
     await expect(canvas).toHaveAttribute('data-ready', 'true');
     const reopened = (await save('reopened')).snapshot;
     for (const field of ['labels', 'colors', 'heights', 'protection'] as const) expect(reopened[field]).toEqual(restored.snapshot[field]);
+    // 新合入的重新识别必须尊重本轮清除后补回产生的人工保护。
+    await page.getByRole('button', { name: '重新识别区域', exact: true }).click();
+    const recognition = page.getByRole('dialog', { name: '识别区域' });
+    await expect(recognition.getByLabel('保留人工修改', { exact: true })).toBeChecked();
+    await recognition.getByRole('button', { name: '生成预览', exact: true }).click();
+    await expect(recognition.getByRole('status')).toContainText('已识别');
+    await recognition.getByRole('button', { name: '应用识别结果', exact: true }).click();
+    await expect(recognition).not.toBeVisible();
+    const protectedResult = (await save('recognition-preserved')).snapshot;
+    for (let y = 10; y < 30; y++) for (let x = 10; x < 30; x++) {
+      const i = y * 80 + x;
+      for (const field of ['labels', 'heights', 'protection'] as const) expect(protectedResult[field][i]).toBe(reopened[field][i]);
+      expect(protectedResult.colors.slice(i * 4, i * 4 + 4)).toEqual(reopened.colors.slice(i * 4, i * 4 + 4));
+    }
+
     await page.setViewportSize({ width: 960, height: 760 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await expect(page.getByRole('button', { name: '补入当前区域', exact: true })).toBeVisible();

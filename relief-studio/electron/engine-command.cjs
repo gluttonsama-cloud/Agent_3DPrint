@@ -1,9 +1,22 @@
 const path = require('node:path');
 const fs = require('node:fs');
 
-module.exports = (app, root, resources, exists = fs.existsSync, platform = process.platform) => action => {
-  // 独立 GPU 模型包当前仅提供 Windows 版本，Mac 试用使用 CPU 引擎。
-  if (platform === 'win32' && ['recognition', 'import'].includes(action)) {
+function requiresGpu(action, payload) {
+  // 显式主体结果只需 CPU 合并；普通对象内的蒙版数据仍交给 Python 严格校验。
+  const suppliedMask = payload && Object.hasOwn(payload, 'subjectMask') && payload.subjectMask != null;
+  if (action === 'recognition' && suppliedMask) {
+    const mask = payload.subjectMask;
+    if (typeof mask !== 'object' || (Object.getPrototypeOf(mask) !== Object.prototype && Object.getPrototypeOf(mask) !== null))
+      throw new TypeError('主体蒙版必须为普通对象或 null');
+    // NaN、无效 Date 等可被 JSON 隐式转成 null；不得把非法蒙版转成缺省预测请求。
+    if (typeof mask.toJSON === 'function') throw new TypeError('主体蒙版不允许自定义 JSON 转换');
+  }
+  return action === 'import' || (action === 'recognition' && payload?.mode !== 'color' && !suppliedMask);
+}
+
+module.exports = (app, root, resources, exists = fs.existsSync, platform = process.platform) => (action, payload) => {
+  // 先校验蒙版，再限制 Windows GPU 包；Mac 保留 CPU 识别与保护合并。
+  if (requiresGpu(action, payload) && platform === 'win32') {
     if (app.isPackaged) {
       const runtime = path.join(require('./model-directory.cjs')(app, exists), 'subject-engine.exe');
       if (exists(runtime)) return [runtime, []];
@@ -16,3 +29,5 @@ module.exports = (app, root, resources, exists = fs.existsSync, platform = proce
     ? [path.join(resources, 'engine', platform === 'win32' ? 'relief-engine.exe' : 'relief-engine'), []]
     : [path.join(root, '.venv', ...(platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python'])), [path.join(root, 'engine', 'main.py')]];
 };
+
+module.exports.requiresGpu = requiresGpu;

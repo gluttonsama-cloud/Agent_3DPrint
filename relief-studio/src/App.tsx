@@ -17,7 +17,7 @@ import { loadImage, readRaster } from './image';
 import { isEditingTarget } from './editor/viewport';
 import { EditorStore, diffSnapshot, heightCandidate } from './editor/store';
 import { fromLegacy, legacyEdit, toLegacy } from './editor/legacy-adapter';
-import type { HeightRequest, HeightOperation, ProjectSnapshot } from './contracts';
+import type { HeightRequest, HeightOperation, ProjectSnapshot, SelectionMask } from './contracts';
 import { createCapabilityService } from './capability-service';
 import { createMockService, runMockHeight, type MockOptions } from './contracts/mock';
 import { HeightPanel } from './panels/HeightPanel';
@@ -91,6 +91,8 @@ export default function App() {
     sizeMm: [number, number];
     validMask?: number[];
     replacing: boolean;
+    snapshot?: ProjectSnapshot;
+    selection?: SelectionMask;
   } | null>(null);
   const [pending, setPending] = useState<null | (() => void)>(null);
   const [colorDraft, setColorDraft] = useState('#808080');
@@ -546,16 +548,20 @@ export default function App() {
             {project && <button
               className="full-button"
               disabled={disabled || !project}
-              onClick={() =>
-                project &&
+              onClick={() => {
+                if (!snapshot) return;
+                const original = document.createElement('canvas');
+                original.width = snapshot.width; original.height = snapshot.height;
+                original.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(snapshot.original), snapshot.width, snapshot.height), 0, 0);
                 setRecognition({
-                  image: project.image,
+                  image: original.toDataURL('image/png'),
                   name: project.name,
                   sizeMm: project.sizeMm,
-                  validMask: project.labels.map((id) => (id ? 1 : 0)),
                   replacing: true,
-                })
-              }
+                  snapshot: structuredClone(snapshot),
+                  selection: selectionMask ? structuredClone(selectionMask) : undefined,
+                });
+              }}
             >
               重新识别区域
             </button>}
@@ -1151,14 +1157,21 @@ export default function App() {
         <RecognitionDialog
           {...recognition}
           onCancel={() => setRecognition(null)}
+          onCandidate={(candidate, signal) => {
+            try {
+              const status = store.current?.accept(candidate, signal) ?? 'stale';
+              if (status === 'applied') {
+                changed(); setSelection([]);
+                setSelected(store.current!.snapshot.regions[0]?.id ?? 0);
+                setTarget(0); setMergeTarget(0);
+              }
+              setNotice(({ applied: '重新识别已应用 · 可撤销', stale: '已丢弃过期识别结果',
+                cancelled: '识别已取消', error: '识别失败，工程保持不变' })[status]);
+              setRecognition(null);
+            } catch (value) { setError(String(value)); }
+          }}
           onApply={(next) => {
-            if (recognition.replacing && project) {
-              edit(next);
-              setSelection([]);
-              setSelected(next.regions[0]?.id ?? 0);
-              setTarget(0);
-              setMergeTarget(0);
-            } else void replace(next, true).catch(value => setError(String(value)));
+            void replace(next, true).catch(value => setError(String(value)));
             setRecognition(null);
             setTool('smart');
             setAdvanced(false);
