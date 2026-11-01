@@ -33,7 +33,9 @@ class AutoTests(unittest.TestCase):
     result = segment({'image': source['image']})
     self.assertEqual(len(result['regions']), 3)
     self.assertTrue(all(r['layers'] == 0 for r in result['regions']))
-    self.assertEqual(result['image'], source['image'])
+    # PNG 压缩字节随平台变化；验证完整像素内容，避免把编码差异误判为图案变化。
+    from relief import decode_image
+    np.testing.assert_array_equal(decode_image(result['image']), decode_image(source['image']))
 
   def test_manual_one_and_valid_range(self):
     pixels = np.tile(np.array([20, 30, 40, 255], dtype=np.uint8), (8, 8, 1))

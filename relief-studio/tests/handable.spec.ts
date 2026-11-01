@@ -71,7 +71,7 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
     await expect(page.locator('.statusbar')).toContainText('工程已恢复');
     const canvas = page.getByLabel('图案编辑画布');
     await expect(canvas).toHaveAttribute('data-ready', 'true');
-    await expect(page.locator('.trim-actions button')).toHaveText(['清除', '只留选中部分']);
+    await expect(page.locator('.trim-actions button')).toHaveText(['清除选中部分', '补入当前区域', '只留选中部分']);
     await expect(page.getByLabel('区域层数', { exact: true })).toBeVisible();
     const box = (await canvas.boundingBox())!;
     const click = (x: number, y: number) =>
@@ -93,7 +93,7 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
       return { ...snapshot, labels: Array.from(snapshot.labels) };
     };
     expect((await save()).labels).toEqual(original.labels);
-    await page.getByRole('button', { name: '清除', exact: true }).click();
+    await page.getByRole('button', { name: '清除选中部分', exact: true }).click();
     const cleared = await save();
     expect(cleared.labels.filter((i: number) => i === 1)).toHaveLength(2100);
     expect(cleared.labels.filter((i: number) => i === 2)).toHaveLength(5800);
@@ -136,7 +136,7 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
     ])
       await page.mouse.move(box.x + box.width * x, box.y + box.height * y, { steps: 8 });
     await page.mouse.up();
-    await expect(page.getByRole('button', { name: '清除', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: '清除选中部分', exact: true })).toBeEnabled();
     await page.screenshot({ path: path.join(output, 'smart-selection.png') });
     await app.evaluate(({ dialog }, directory) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [directory] });

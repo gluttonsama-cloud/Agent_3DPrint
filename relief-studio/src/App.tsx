@@ -10,7 +10,7 @@ import { NameField, NumberField } from './Fields';
 import { mergeRegions, nextRegionId, projectStats } from './model';
 import type { SelectionOperation } from './selection';
 import { combineSelection, regionSelection } from './selection';
-import { trimRegion } from './trim';
+import { restoreSelection, trimRegion } from './trim';
 import { StlDialog } from './StlDialog';
 import { encodeProject } from './project-codec';
 import { loadImage, readRaster } from './image';
@@ -309,12 +309,26 @@ export default function App() {
     );
   }
   function excludeSelection() {
-    if (!project || !selection.length) return;
+    if (!advanced) { trimSelection('clear'); return; }
+    if (!project || !selection.length || selecting) return;
     const labels = project.labels.slice();
-    for (const index of selection) labels[index] = 0;
+    let count = 0;
+    for (const index of selection) if (labels[index]) { labels[index] = 0; count++; }
+    if (!count) { setNotice('选区内没有需要清除的打印像素'); return; }
     edit({ ...project, labels });
     setSelection([]);
-    setNotice('已从打印范围排除选区');
+    setSelectionReset(value => value + 1);
+    setNotice(`已跨区域清除 ${count} 个像素 · 可撤销`);
+  }
+  function restoreSelected() {
+    if (!project || !snapshot || !selection.length || selecting) return;
+    const next = restoreSelection(project, selected, selection, snapshot.original, advanced);
+    if (next === project) { setNotice('没有可增补的像素：默认只补未打印部分，透明原图不可补入'); return; }
+    const count = next.labels.reduce((n, id, i) => n + Number(id !== project.labels[i]), 0);
+    edit(next);
+    setSelection([]);
+    setSelectionReset(value => value + 1);
+    setNotice(`已补入“${region?.name}” ${count} 个像素${advanced ? '（允许覆盖邻区）' : ''} · 可撤销`);
   }
   async function recolor() {
     if (!project || !region) return;
@@ -369,8 +383,7 @@ export default function App() {
         setSelectionReset((value) => value + 1);
       } else if (key === 'delete') {
         event.preventDefault();
-        if (advanced) excludeSelection();
-        else trimSelection('clear');
+        excludeSelection();
       } else if (!ctrl) {
         if (key === 'w') {
           selectWholeRegion(event.altKey ? 'subtract' : event.shiftKey ? 'add' : operation);
@@ -720,12 +733,12 @@ export default function App() {
                         onChange={(event) => setOperation(event.target.value as SelectionOperation)}
                       >
                         <option value="replace">新选区</option>
-                        <option value="add">添加到选区</option>
+                        <option value="add">追加选区（不改变打印内容）</option>
                         <option value="subtract">从选区减去</option>
                       </select>
                     </label>
-                    <small className="scope-badge" title="画布选取范围；在更多区域操作中修改，Shift 追加、Alt 减去">
-                      {advanced ? '跨区域' : '当前区域'}
+                    <small className="scope-badge" title="画布选取范围；在右侧当前区域中修改，Shift 追加、Alt 减去">
+                      {advanced ? '跨区域覆盖' : '当前区域 + 未打印'}
                     </small>
                   </>
                 ) : tool === 'hand' ? (
@@ -781,6 +794,7 @@ export default function App() {
                   disabled={disabled || view === 'preview' || !!(crop || recognition || pending || stl)}
                   project={project}
                   pixelHeights={snapshot?.heights}
+                  original={snapshot?.original}
                   simple={!advanced}
                   snapEdges={snapEdges}
                   tolerance={tolerance}
@@ -910,9 +924,18 @@ export default function App() {
                     </button>
                   ))}
                 </div>
+                <label className="selection-scope">
+                  <input type="checkbox" aria-label="允许跨区域选取" checked={advanced} disabled={disabled}
+                    onChange={event => { setAdvanced(event.target.checked); setSelectionReset(value => value + 1); }} />
+                  允许跨区域选取、清除与覆盖
+                </label>
+                <small>默认可圈选当前区域和未打印部分；增补不覆盖邻区。跨区域开启后，清除和增补会影响选中的其他区域。</small>
                 <div className="trim-actions">
-                  <button disabled={disabled || selecting || !selectedCount}
-                    title="清除当前区域选中的部分；可撤销" onClick={() => trimSelection('clear')}>清除</button>
+                  <button disabled={disabled || selecting || !(advanced ? selection.length : selectedCount)}
+                    title={advanced ? '清除选区内所有区域的打印像素；与 Delete 相同' : '清除当前区域选中的部分；与 Delete 相同'} onClick={excludeSelection}>清除选中部分</button>
+                  <button disabled={disabled || selecting || !selection.length}
+                    title={advanced ? '将选区补入当前区域，允许覆盖其他区域；透明原图除外' : '只将选区内未打印部分补入当前区域，不覆盖其他区域'}
+                    onClick={restoreSelected}>补入当前区域</button>
                   <button disabled={disabled || selecting || !selectedCount}
                     title="删除当前区域未选中的部分，其他区域不变；可撤销"
                     onClick={() => trimSelection('keep')}>只留选中部分</button>
@@ -946,11 +969,6 @@ export default function App() {
           </>}
             <details className="advanced-properties">
               <summary>更多区域操作</summary>
-              <label className="selection-scope">
-                <input type="checkbox" aria-label="允许跨区域选取" checked={advanced} disabled={disabled}
-                  onChange={event => { setAdvanced(event.target.checked); setSelectionReset(value => value + 1); }} />
-                允许跨区域选取与排除
-              </label>
               <section className="sidebar-section">
                 <h2>区域属性</h2>
                 {project && region ? (

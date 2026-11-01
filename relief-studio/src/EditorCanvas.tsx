@@ -3,6 +3,7 @@ import type { Project } from './types';
 import { connectedSelection, heightValues } from './model';
 import {
   combineSelection,
+  selectablePixel,
   regionSelection,
   selectionEdges,
   type SelectionOperation,
@@ -35,6 +36,7 @@ interface Props {
   selectionReset: number;
   project: Project;
   pixelHeights?: Uint16Array;
+  original?: Uint8Array;
   selected: number;
   tool: Tool;
   radius: number;
@@ -154,9 +156,8 @@ export function EditorCanvas(props: Props) {
         latest.current.onSelection(
           combineSelection(
             pending.baseline,
-            current.simple
-              ? indices.filter((i) => current.project.labels[i] === current.selected)
-              : indices,
+            indices.filter((i) => selectablePixel(current.project.labels[i], current.selected, !current.simple,
+              (current.original ?? rgba.current?.data)?.[i * 4 + 3] ?? 0)),
             pending.operation,
           ),
         );
@@ -359,11 +360,11 @@ export function EditorCanvas(props: Props) {
     request.current = null;
     props.onSelecting(false);
     const allowed = Uint8Array.from(project.labels, (id, i) =>
-      id === selected && rgba.current!.data[i * 4 + 3] > 0 ? 1 : 0,
+      selectablePixel(id, selected, !props.simple, (props.original ?? rgba.current!.data)[i * 4 + 3]) ? 1 : 0,
     );
     if (!allowed[point[1] * project.width + point[0]]) {
       smartSeed.current = null;
-      props.onError('请点击当前层的图案，或先在左侧切换层。');
+      props.onError('请点击当前区域或原图非透明的未打印部分；选择其他区域需开启跨区域范围。');
       return;
     }
     const id = ++requestId.current;
@@ -644,11 +645,13 @@ export function EditorCanvas(props: Props) {
                 const index = p[1] * project.width + p[0],
                   id = project.labels[index];
                 // 连通点选遵守画布范围，不隐式激活或追加其他区域。
-                if (tool === 'connected' && props.simple && id !== selected) return;
+                if (tool === 'connected' && !selectablePixel(id, selected, !props.simple,
+                  (props.original ?? rgba.current.data)[index * 4 + 3])) return;
                 const next =
                   tool === 'color'
                     ? regionSelection(project.labels, id)
-                    : connectedSelection(project.labels, project.width, project.height, index);
+                    : connectedSelection(project.labels, project.width, project.height, index).filter(i =>
+                      selectablePixel(project.labels[i], selected, !props.simple, (props.original ?? rgba.current!.data)[i * 4 + 3]));
                 const op = event.altKey ? 'subtract' : event.shiftKey ? 'add' : operation;
                 props.onSelection(combineSelection(selection, next, op));
                 if (id && op === 'replace') props.onSelect(id);

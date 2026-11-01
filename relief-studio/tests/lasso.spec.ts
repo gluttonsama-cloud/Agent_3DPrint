@@ -94,7 +94,7 @@ test('磁性套索实时吸附轮廓，闭合后实际清除及撤销像素正�
     await expect(page.getByTestId('selection-count')).not.toHaveAttribute('data-count', '0');
     const count = Number(await page.getByTestId('selection-count').getAttribute('data-count'));
     expect(count).toBeGreaterThan(3900); expect(count).toBeLessThan(4500);
-    await page.getByRole('button', { name: '清除', exact: true }).click();
+    await page.getByRole('button', { name: '清除选中部分', exact: true }).click();
     const filename = path.join(process.cwd(), 'artifacts', 'magnetic-cleared.json');
     await app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: file }); }, filename);
     await page.getByRole('button', { name: '保存工程', exact: true }).click();
@@ -180,7 +180,7 @@ test('科尔沁真实徽标放大后描牛头轮廓，可以确认且仅选择�
     expect(Number(await page.getByTestId('selection-count').getAttribute('data-count'))).toBeLessThan(5000);
     expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('');
     await page.screenshot({ path: 'artifacts/workbench/magnetic-logo-confirmed.png' });
-    await page.getByRole('button', { name: '清除', exact: true }).click();
+    await page.getByRole('button', { name: '清除选中部分', exact: true }).click();
     const filename = path.join(process.cwd(), 'artifacts', 'magnetic-logo-cleared.json');
     await app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: file }); }, filename);
     await page.getByRole('button', { name: '保存工程', exact: true }).click();

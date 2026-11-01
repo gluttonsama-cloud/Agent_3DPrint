@@ -174,7 +174,7 @@ test('跨区域范围只由显式设置控制，Delete 按当前区域或全部�
   }
 });
 
-test('全选取消尚未返回的真实智能选区，迟到结果不能覆盖全选', async () => {
+for (const cancellation of ['whole', 'escape', 'tool', 'region'] as const) test(`取消尚未返回的真实智能选区：${cancellation}`, async () => {
   const app = await launch();
   try {
     const page = await app.firstWindow();
@@ -199,11 +199,14 @@ test('全选取消尚未返回的真实智能选区，迟到结果不能覆盖�
     const box = (await canvas.boundingBox())!;
     await canvas.click({ position: { x: box.width * 20 / 80, y: box.height * 20 / 40 } });
     await expect(page.getByText('正在识别选区…', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: '选择整个区域', exact: true }).click();
-    await expect(page.getByTestId('selection-count')).toHaveAttribute('data-count', '800');
+    if (cancellation === 'whole') await page.getByRole('button', { name: '选择整个区域', exact: true }).click();
+    else if (cancellation === 'escape') await page.keyboard.press('Escape');
+    else if (cancellation === 'tool') await page.getByRole('button', { name: '选区', exact: true }).click();
+    else await page.locator('.region-card').filter({ hasText: '背景' }).click();
+    await expect(page.getByTestId('selection-count')).toHaveAttribute('data-count', cancellation === 'whole' ? '800' : '0');
     await expect.poll(() => page.evaluate(() => (window as Window & { deliveredSelections: number }).deliveredSelections)).toBe(1);
     expect(await page.evaluate(() => (window as Window & { delayedSelectionCount: number }).delayedSelectionCount)).toBe(400);
-    await expect(page.getByTestId('selection-count')).toHaveAttribute('data-count', '800');
+    await expect(page.getByTestId('selection-count')).toHaveAttribute('data-count', cancellation === 'whole' ? '800' : '0');
     await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeDisabled();
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach(window => window.destroy()));
@@ -256,6 +259,66 @@ test('修补入口补画与擦除保留原色，撤销完整恢复工程', async
     expect(erased.colors).toEqual(before.colors);
     await page.getByRole('button', { name: '撤销', exact: true }).click();
     expect((await save()).labels).toEqual(before.labels);
+  } finally {
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach(window => window.destroy()));
+    await app.close();
+  }
+});
+
+test('智能跨区追加减去，清除后直接框选补回并原生保存重开', async () => {
+  const app = await launch();
+  try {
+    const page = await app.firstWindow();
+    const fixture = await openScopeFixture(app, page);
+    const canvas = page.getByLabel('图案编辑画布');
+    const count = page.getByTestId('selection-count');
+    const click = async (x: number, y: number, modifiers: ('Shift' | 'Alt')[] = []) => {
+      const box = (await canvas.boundingBox())!;
+      await canvas.click({ position: { x: (x + 0.5) / 80 * box.width, y: (y + 0.5) / 40 * box.height }, modifiers });
+    };
+    await click(20, 20);
+    await expect(count).toHaveAttribute('data-count', '400');
+    await click(5, 5, ['Shift']);
+    await expect(count).toHaveAttribute('data-count', '400');
+    await page.getByLabel('允许跨区域选取').check();
+    await click(5, 5, ['Shift']);
+    await expect(count).toHaveAttribute('data-count', '2800');
+    await click(5, 5, ['Alt']);
+    await expect(count).toHaveAttribute('data-count', '400');
+    await page.getByLabel('允许跨区域选取').uncheck();
+    await page.getByRole('button', { name: '清除选中部分', exact: true }).click();
+    await expect(count).toHaveAttribute('data-count', '0');
+    await expect(page.getByRole('button', { name: '补入当前区域', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: '选区', exact: true }).click();
+    const box = (await canvas.boundingBox())!;
+    await page.mouse.move(box.x + 0.1, box.y + 0.1); await page.mouse.down();
+    await page.mouse.move(box.x + box.width, box.y + box.height); await page.mouse.up();
+    await expect(count).toHaveAttribute('data-count', '800');
+    await page.getByRole('button', { name: '补入当前区域', exact: true }).click();
+    const save = async (suffix: string) => {
+      const filename = path.join(process.cwd(), 'artifacts', `selection-restore-${suffix}.json`);
+      await app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: file }); }, filename);
+      await page.getByRole('button', { name: '保存工程', exact: true }).click();
+      await expect.poll(() => fs.readFile(filename, 'utf8').then(value => JSON.parse(value), () => null)).not.toBeNull();
+      return { filename, snapshot: decodeProject(JSON.parse(await fs.readFile(filename, 'utf8'))) };
+    };
+    const restored = await save('restored');
+    expect(Array.from(restored.snapshot.labels)).toEqual(fixture.labels);
+    expect(restored.snapshot.protection[20 * 80 + 20]).toBe(7);
+    expect(restored.snapshot.heights[20 * 80 + 20]).toBe(10);
+    expect(restored.snapshot.protection[5 * 80 + 5]).toBe(0);
+    await page.getByRole('button', { name: '撤销', exact: true }).click();
+    expect((await save('undo')).snapshot.labels[20 * 80 + 20]).toBe(0);
+    await page.getByRole('button', { name: '重做', exact: true }).click();
+    const redone = await save('redo');
+    await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, redone.filename);
+    await page.getByRole('button', { name: '打开工程', exact: true }).click();
+    await expect(canvas).toHaveAttribute('data-ready', 'true');
+    const reopened = (await save('reopened')).snapshot;
+    for (const field of ['labels', 'colors', 'heights', 'protection'] as const) expect(reopened[field]).toEqual(restored.snapshot[field]);
+    await page.setViewportSize({ width: 960, height: 760 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.getByRole('button', { name: '补入当前区域', exact: true })).toBeVisible();
   } finally {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach(window => window.destroy()));
     await app.close();

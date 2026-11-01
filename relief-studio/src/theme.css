@@ -169,6 +169,7 @@ select:disabled {
   font-size: 12px;
 }
 .trim-panel .trim-actions {
+  flex-wrap: wrap;
   margin-top: 16px;
   gap: 6px;
 }

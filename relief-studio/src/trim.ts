@@ -47,3 +47,17 @@ export function polygonSelection(points: [number, number][], width: number, heig
   }
   return result;
 }
+
+/** 增补默认只填未打印像素，跨区域覆盖必须显式开启。 */
+export function restoreSelection(project: Project, selected: number, selection: number[], original: Uint8Array, crossRegion = false): Project {
+  if (!project.regions.some(region => region.id === selected)) return project;
+  const labels = project.labels.slice();
+  let changed = false;
+  for (const index of selection) {
+    if (!Number.isInteger(index) || index < 0 || index >= labels.length || !original[index * 4 + 3]) continue;
+    if (labels[index] === selected || (!crossRegion && labels[index] !== 0)) continue;
+    labels[index] = selected;
+    changed = true;
+  }
+  return changed ? { ...project, labels } : project;
+}

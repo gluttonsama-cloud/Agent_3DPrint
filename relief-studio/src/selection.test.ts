@@ -1,3 +1,4 @@
+import { selectablePixel } from './selection';
 import { expect, it } from 'vitest';
 import { combineSelection, regionSelection, selectionEdges } from './selection';
 
@@ -17,4 +18,10 @@ it('轮廓仅描绘外边缘和孔洞，没有内部填充或相邻像素分界'
   expect(edges).toHaveLength(6);
   expect(edges).not.toContainEqual([1, 0, 1, 1]);
   expect(selectionEdges([0, 1, 2, 3, 5, 6, 7, 8], 3, 3)).toHaveLength(16);
+});
+
+it('选取范围允许补回未打印部分，跨区域显式开启，透明原图始终排除', () => {
+  expect([0, 1, 2].map(id => selectablePixel(id, 1, false, 255))).toEqual([true, true, false]);
+  expect([0, 1, 2].map(id => selectablePixel(id, 1, true, 255))).toEqual([true, true, true]);
+  expect([0, 1, 2].map(id => selectablePixel(id, 1, true, 0))).toEqual([false, false, false]);
 });

@@ -30,3 +30,8 @@ export function selectionEdges(selection: number[], width: number, height: numbe
   }
   return edges;
 }
+
+/** 默认允许圈回未打印像素，但不抢占邻区；透明原图始终不可选。 */
+export function selectablePixel(label: number, selected: number, crossRegion: boolean, alpha: number) {
+  return alpha > 0 && (crossRegion || label === selected || label === 0);
+}
