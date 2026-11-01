@@ -133,7 +133,10 @@ def bevel_heights(source, labels, target, radius, cancelled, spacing=None):
     supported[:-1, 1:] |= squares
     supported[1:, :-1] |= squares
     supported[1:, 1:] |= squares
-    neighbors = cv2.filter2D(plateau.astype('uint8'), -1, cross, borderType=cv2.BORDER_CONSTANT)-plateau
+    # 四邻域计数采用整数切片，避免原生卷积优化在不同架构上的舍入差异。
+    padded = np.pad(plateau.astype('uint8'), 1)
+    neighbors = (padded[:-2, 1:-1]+padded[2:, 1:-1]+
+                 padded[1:-1, :-2]+padded[1:-1, 2:])
     adjacent = cv2.dilate(supported.astype('uint8'), cross) != 0
     # 圆/菱形的单像素帽尖随台面倒角，避免留下高针；长细尾内点、远端及窄桥保持原高。
     supported |= plateau & (neighbors == 1) & adjacent

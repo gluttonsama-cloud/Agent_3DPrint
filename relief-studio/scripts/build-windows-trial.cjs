@@ -11,7 +11,7 @@ run('scripts/python.cjs', ['-m', 'PyInstaller', '--noconfirm', '--clean', '--one
 run('scripts/collect_licenses.cjs');
 run('node_modules/electron-builder/cli.js', ['--win', 'nsis', '--x64', '--publish', 'never',
   '-c.artifactName=Relief-Studio-${version}-integrated-80392e2-${arch}-Setup.${ext}']);
-// NSIS 外壳可为 32 位，实际应用和 Python 原生依赖必须全部为 x64。
+// NSIS 外壳及官方提权辅助程序可为 32 位；应用和 Python 原生依赖必须为 x64。
 let checked = 0;
 function inspect(directory) {
   for (const item of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -19,7 +19,9 @@ function inspect(directory) {
     if (item.isDirectory()) inspect(filename);
     else if (/\.(exe|dll|pyd)$/i.test(item.name)) {
       const bytes = fs.readFileSync(filename), offset = bytes.readUInt32LE(0x3c);
-      if (bytes.toString('ascii', 0, 2) !== 'MZ' || bytes.toString('ascii', offset, offset + 4) !== 'PE\0\0' || bytes.readUInt16LE(offset + 4) !== 0x8664)
+      const isInstallerHelper = filename === path.join(root, 'release/win-unpacked/resources/elevate.exe');
+      const machine = bytes.readUInt16LE(offset + 4);
+      if (bytes.toString('ascii', 0, 2) !== 'MZ' || bytes.toString('ascii', offset, offset + 4) !== 'PE\0\0' || (machine !== 0x8664 && !(isInstallerHelper && machine === 0x14c)))
         throw new Error(`非 Windows x64 原生依赖：${filename}`);
       checked++;
     }
