@@ -7,7 +7,7 @@ async function launch() {
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
   const packaged = env.RELIEF_TEST_PACKAGED === '1';
   if (packaged) {
-    env.PATH = `${process.env.SystemRoot}\\System32`;
+    env.PATH = process.platform === 'win32' ? `${process.env.SystemRoot}\\System32` : '/usr/bin:/bin';
     delete env.PYTHONHOME; delete env.PYTHONPATH;
   }
   const app = await electron.launch(packaged ? {

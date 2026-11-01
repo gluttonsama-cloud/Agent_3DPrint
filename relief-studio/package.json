@@ -20,7 +20,8 @@
     "dist:win": "npm run build && npm run build:engine && node scripts/collect_licenses.cjs && electron-builder --win nsis",
     "build:gpu": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build_subject.ps1",
     "dist:gpu": "electron-builder --win nsis --config installer/electron-builder.gpu.cjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "dist:mac:arm64": "node scripts/build-macos.cjs"
   },
   "dependencies": {
     "react": "^19.1.0",

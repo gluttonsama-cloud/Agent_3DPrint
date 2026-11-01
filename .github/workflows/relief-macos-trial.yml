@@ -1,0 +1,67 @@
+name: Relief Studio Mac arm64 trial
+on:
+  workflow_dispatch:
+  push:
+    branches: [cys/selection-repair]
+    paths: ['relief-studio/**', '.github/workflows/relief-macos-trial.yml']
+permissions:
+  contents: read
+jobs:
+  mac-arm64:
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: relief-studio
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: arm64
+      - name: Install native arm64 dependencies
+        run: |
+          test "$(uname -m)" = arm64
+          npm ci
+          python -m venv .venv
+          .venv/bin/python -m pip install -r engine/requirements.txt
+      - name: Test source
+        run: |
+          npm test
+          npm run test:ipc
+          npm run test:engine
+      - name: Build and inspect ad-hoc trial DMG
+        run: npm run dist:mac:arm64
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Exercise packaged desktop and native save
+        run: |
+          mkdir -p artifacts
+          npm run test:e2e -- tests/tool-groups.spec.ts tests/handable.spec.ts tests/workbench.spec.ts tests/lasso.spec.ts
+        env:
+          RELIEF_TEST_PACKAGED: '1'
+          RELIEF_TEST_EXECUTABLE: ${{ github.workspace }}/relief-studio/release/mac-trial/mac-arm64/Relief Studio.app/Contents/MacOS/Relief Studio
+      - name: Record checksums
+        run: shasum -a 256 release/mac-trial/*.dmg > release/mac-trial/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Relief-Studio-mac-arm64-trial
+          path: |
+            relief-studio/release/mac-trial/*.dmg
+            relief-studio/release/mac-trial/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: mac-trial-test-diagnostics
+          path: |
+            relief-studio/artifacts/e2e-results.json
+            relief-studio/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7

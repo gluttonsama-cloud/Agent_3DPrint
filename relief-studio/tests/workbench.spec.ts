@@ -6,7 +6,7 @@ function launchEnv(): Record<string, string> {
     .filter((entry): entry is [string, string] => entry[1] !== undefined));
   delete env.ELECTRON_RUN_AS_NODE;
   if (env.RELIEF_TEST_PACKAGED === '1') {
-    env.PATH = `${process.env.SystemRoot}\\System32`;
+    env.PATH = process.platform === 'win32' ? `${process.env.SystemRoot}\\System32` : '/usr/bin:/bin';
     delete env.PYTHONHOME; delete env.PYTHONPATH;
   }
   return env;

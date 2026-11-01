@@ -11,8 +11,8 @@ async function main() {
     await fs.copyFile(license, path.join(destination, `${name}-LICENSE.txt`));
   }
   const result = spawnSync(
-    path.join(root, '.venv', 'Scripts', 'python.exe'),
-    [path.join(root, 'scripts', 'collect_python_licenses.py')],
+    process.execPath,
+    [path.join(root, 'scripts', 'python.cjs'), path.join(root, 'scripts', 'collect_python_licenses.py')],
     { cwd: root, stdio: 'inherit', shell: false },
   );
   if (result.status !== 0) throw new Error('Python 许可收集失败');

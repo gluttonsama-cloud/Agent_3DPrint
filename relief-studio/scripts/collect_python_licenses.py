@@ -2,6 +2,7 @@
 import importlib.metadata
 import shutil
 import sys
+import sysconfig
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,9 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
   destination = ROOT/'licenses'
   destination.mkdir(exist_ok=True)
-  source = Path(sys.base_prefix)/'LICENSE.txt'
-  if source.exists():
-    shutil.copyfile(source, destination/'Python-LICENSE.txt')
+  # 官方 Python 在不同平台可能将许可放在运行库或 Framework 资源中。
+  candidates = [Path(sys.base_prefix)/'LICENSE.txt', Path(sysconfig.get_path('stdlib'))/'LICENSE.txt',
+                Path(sys.base_prefix)/'Resources/English.lproj/License.rtf']
+  source = next((item for item in candidates if item.is_file()), None)
+  if source:
+    shutil.copyfile(source, destination/f'Python-LICENSE{source.suffix}')
   else:
     raise FileNotFoundError('未找到 Python 运行时 LICENSE.txt')
   for name in ['numpy','opencv-python-headless','Pillow','psutil']:
