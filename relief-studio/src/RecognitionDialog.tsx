@@ -19,6 +19,7 @@ interface Props {
   selection?: SelectionMask;
   onCandidate?(result: OperationResult<EditPatch>, signal: AbortSignal): void;
   onCancel(): void;
+  onBack?(): void;
   onApply(project: Project): void;
 }
 type RecognitionCandidate = {
@@ -258,9 +259,23 @@ export function RecognitionDialog(props: Props) {
       setStatus('识别已取消');
     }
   }
-  async function close() {
-    await cancel();
-    props.onCancel();
+  const [leaving, setLeaving] = useState(false);
+  const leavingRef = useRef(false);
+  async function leave(back = false) {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+    setLeaving(true);
+    setPreview(null); setSubjectPreview(null); setColorCandidate(null); setSubjectCandidate(null);
+    try {
+      await cancel();
+      if (!alive.current) return;
+      if (back) props.onBack?.(); else props.onCancel();
+    } catch (error) {
+      if (alive.current) {
+        setStatus(`停止识别失败，请重试：${String(error)}`);
+        leavingRef.current = false; setLeaving(false);
+      }
+    }
   }
   async function generate() {
     await run(async (id) => {
@@ -457,10 +472,13 @@ export function RecognitionDialog(props: Props) {
   }
   return (
     <div className="modal-backdrop">
-      <section className="recognition-dialog" role="dialog" aria-modal="true" aria-label="识别区域">
+      <section className="recognition-dialog" role="dialog" aria-modal="true" aria-label="识别区域" inert={leaving}>
         <header>
           <h2>识别区域</h2>
-          <button onClick={close}>取消</button>
+          <div>
+            {props.onBack && <button onClick={() => void leave(true)}>返回裁剪</button>}
+            <button onClick={() => void leave()}>取消</button>
+          </div>
         </header>
         <div className="recognition-body">
           <aside>
@@ -787,7 +805,7 @@ export function RecognitionDialog(props: Props) {
           <button
             className="primary"
             disabled={
-              busy || !ready || (route === 'color' && !preview) || (route === 'subject' && !subject) ||
+              leaving || busy || !ready || (route === 'color' && !preview) || (route === 'subject' && !subject) ||
               (!!props.snapshot && (route === 'color' ? !colorCandidate : !subjectCandidate || !subject?.some(Boolean)))
             }
             onClick={apply}

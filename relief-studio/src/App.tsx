@@ -23,6 +23,7 @@ import { createMockService, runMockHeight, type MockOptions } from './contracts/
 import { HeightPanel } from './panels/HeightPanel';
 import { ExportPanel } from './panels/ExportPanel';
 import { initialSizeMm, resizeMm } from './physical-size';
+import type { CropState } from './crop';
 
 function bridge() {
   if (!window.relief) throw new Error('此操作需要桌面版。请在 Relief Studio 中打开工程。');
@@ -87,7 +88,7 @@ export default function App() {
   const [layer, setLayer] = useState(1),
     [target, setTarget] = useState(0);
   const [mergeTarget, setMergeTarget] = useState(0);
-  const [crop, setCrop] = useState<{ image: string; name: string } | null>(null);
+  const [crop, setCrop] = useState<{ image: string; name: string; state?: CropState } | null>(null);
   const [recognition, setRecognition] = useState<{
     image: string;
     name: string;
@@ -234,16 +235,15 @@ export default function App() {
       void run('读取图片', async () => {
         const result = await readRaster(value);
         setCrop({ image: result.image, name: value.name.replace(/\.[^.]+$/, '') });
-        if (result.resized) setNotice('工作图已等比例缩至最长边 2048 px');
       });
     });
   }
-  function finishCrop(image: string) {
+  function finishCrop(image: string, state: CropState) {
     void run('准备识别', async () => {
       const source = await loadImage(image);
       setRecognition({ image, name: crop?.name || '未命名',
         sizeMm: initialSizeMm(source.width, source.height), replacing: false });
-      setCrop(null);
+      setCrop(previous => previous ? { ...previous, state } : null);
     });
   }
   function undo() {
@@ -1156,7 +1156,8 @@ export default function App() {
       {recognition && (
         <RecognitionDialog
           {...recognition}
-          onCancel={() => setRecognition(null)}
+          onCancel={() => { setRecognition(null); setCrop(null); }}
+          onBack={crop && !recognition.replacing ? () => setRecognition(null) : undefined}
           onCandidate={(candidate, signal) => {
             try {
               const status = store.current?.accept(candidate, signal) ?? 'stale';
@@ -1173,6 +1174,7 @@ export default function App() {
           onApply={(next) => {
             void replace(next, true).catch(value => setError(String(value)));
             setRecognition(null);
+            setCrop(null);
             setTool('smart');
             setAdvanced(false);
             setOperation('replace');
@@ -1181,14 +1183,15 @@ export default function App() {
           }}
         />
       )}
-      {crop && (
+      {crop && !recognition && (
         <CropDialog
           image={crop.image}
+          initial={crop.state}
           onCancel={() => {
             if (!busy) setCrop(null);
           }}
-          onConfirm={(image) => {
-            if (!busy) void finishCrop(image);
+          onConfirm={(image, state) => {
+            if (!busy) void finishCrop(image, state);
           }}
         />
       )}
