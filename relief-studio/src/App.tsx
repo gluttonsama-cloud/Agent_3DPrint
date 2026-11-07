@@ -22,6 +22,7 @@ import { createCapabilityService } from './capability-service';
 import { createMockService, runMockHeight, type MockOptions } from './contracts/mock';
 import { HeightPanel } from './panels/HeightPanel';
 import { ExportPanel } from './panels/ExportPanel';
+import { initialSizeMm, resizeMm } from './physical-size';
 
 function bridge() {
   if (!window.relief) throw new Error('此操作需要桌面版。请在 Relief Studio 中打开工程。');
@@ -71,6 +72,8 @@ export default function App() {
   const [snapEdges, setSnapEdges] = useState(true);
   const [tolerance, setTolerance] = useState(24);
   const [stl, setStl] = useState(false);
+  const [sizeLocked, setSizeLocked] = useState(true);
+  const [sizeInputVersion, resetSizeInputs] = useState(0);
   const [selecting, setSelecting] = useState(false);
   const [selectionReset, setSelectionReset] = useState(0);
   const [selection, setSelection] = useState<number[]>([]),
@@ -167,6 +170,7 @@ export default function App() {
     setTool('smart');
     setAdvanced(false);
     setOperation('replace');
+    setSizeLocked(true);
   }
   async function run(label: string, action: () => Promise<void>) {
     if (running.current) return;
@@ -235,8 +239,12 @@ export default function App() {
     });
   }
   function finishCrop(image: string) {
-    setRecognition({ image, name: crop?.name || '未命名', sizeMm: [55, 55], replacing: false });
-    setCrop(null);
+    void run('准备识别', async () => {
+      const source = await loadImage(image);
+      setRecognition({ image, name: crop?.name || '未命名',
+        sizeMm: initialSizeMm(source.width, source.height), replacing: false });
+      setCrop(null);
+    });
   }
   function undo() {
     if (!project || !past.length) return;
@@ -566,6 +574,7 @@ export default function App() {
                   <label key={label}>
                     {label}
                     <NumberField
+                      key={sizeInputVersion}
                       label={label}
                       value={project.sizeMm[index]}
                       min={0.1}
@@ -573,14 +582,23 @@ export default function App() {
                       step={0.1}
                       disabled={disabled}
                       onCommit={(value) => {
-                        const size = [...project.sizeMm] as [number, number];
-                        size[index] = value;
-                        edit({ ...project, sizeMm: size });
+                        try {
+                          const size = resizeMm(project.sizeMm, index, value, sizeLocked);
+                          setError('');
+                          edit({ ...project, sizeMm: size });
+                        } catch (value) {
+                          setError(String(value));
+                          resetSizeInputs(version => version + 1);
+                        }
                       }}
                     />
                   </label>
                 ))}
               </div>
+              <button className="text-button" aria-pressed={sizeLocked}
+                disabled={disabled} onClick={() => setSizeLocked(value => !value)}>
+                {sizeLocked ? '比例已锁定' : '比例已解锁'}
+              </button>
             </section>
           )}
           <section className="regions-section">
