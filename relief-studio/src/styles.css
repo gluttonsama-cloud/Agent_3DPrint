@@ -908,10 +908,18 @@ kbd {
 }
 .crop-outline {
   position: absolute;
-  pointer-events: none;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: move;
   border: 2px solid #2879b9;
   box-shadow: 0 0 0 2000px #13263866;
 }
+.crop-handle { position: absolute; width: 14px; height: 14px; background: white; border: 2px solid #2879b9; touch-action: none; }
+.crop-handle.nw { top: 0; left: 0; cursor: nwse-resize; }
+.crop-handle.ne { top: 0; right: 0; cursor: nesw-resize; }
+.crop-handle.sw { bottom: 0; left: 0; cursor: nesw-resize; }
+.crop-handle.se { bottom: 0; right: 0; cursor: nwse-resize; }
+.crop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .modal-footer {
   margin-top: 18px;
   display: flex;
