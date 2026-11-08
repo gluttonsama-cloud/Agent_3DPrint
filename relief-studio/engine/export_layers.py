@@ -40,8 +40,14 @@ def jpeg_check(source, decoded):
 
 
 def export_bundle(snapshot, destination, *, formats=('png',), obj=False, device=None, settings=None, obj_options=None,
-                  cancelled=lambda: False, progress=lambda completed, total, message: None):
+                  print_format=None, white_options=None, cancelled=lambda: False, progress=lambda completed, total, message: None):
   serialized = dumps_project(snapshot)
+  print_format = print_format or ('png' if 'png' in formats else 'jpg')
+  if print_format not in ('png', 'jpg') or print_format not in formats:
+    raise ValueError('实际打印格式必须包含在输出格式中')
+  from production import white_masks, estimate
+  masks = white_masks(snapshot, white_options)
+  dpi = tuple(snapshot[k] / snapshot['sizeMm'][i] * 25.4 for i, k in enumerate(('width', 'height')))
   config = output_settings(settings)
   if not formats or set(formats) - {'png', 'jpg', 'jpeg'}:
     raise ValueError('输出格式只支持 png/jpg/jpeg')
@@ -71,15 +77,15 @@ def export_bundle(snapshot, destination, *, formats=('png',), obj=False, device=
     color = snapshot['colors'].reshape(height, width, 4).copy()
     color[~coverage, 3] = 0
     maximum = int(heights.max())
-    adapted = settings is not None or bool({'jpg','jpeg'} & set(formats))
+    adapted = settings is not None or white_options is not None or bool({'jpg','jpeg'} & set(formats))
     jpeg = bool({'jpg','jpeg'} & set(formats))
-    total = maximum + 5 + ((maximum + 1) * (int('png' in formats)+int(jpeg)) + 1 if adapted else 0) + (4 if obj else 0) + (1 if jpeg else 0)
+    total = maximum + 6 + ((maximum + 1) * (int('png' in formats)+int(jpeg)) + 1 if adapted else 0) + (4 if obj else 0) + (1 if jpeg else 0)
     def added(name, role):
       files.append({'path':str(destination / name), 'role':role})
       progress(len(files), total, name)
     def save(image, name):
       checkpoint(cancelled)
-      image.save(temporary / name)
+      image.save(temporary / name, dpi=dpi)
       added(name, 'white' if name.startswith('white/') else name.split('.')[0])
     (temporary / 'project.json').write_text(serialized, encoding='utf-8')
     added('project.json','project')
@@ -107,13 +113,15 @@ def export_bundle(snapshot, destination, *, formats=('png',), obj=False, device=
         yield 'color',image,None
         for layer in range(1,maximum+1):
           checkpoint(cancelled)
-          pixels=orient(white_values(coverage & (heights>=layer),profile['whitePolarity']),config)
+          pixels=orient(masks(layer),config)
+          if profile['whitePolarity'] == 'black-is-ink':
+            pixels = 255-pixels
           yield f'{layer:04d}',Image.fromarray(pixels),pixels
       for stem,adapted_image,pixels in images():
         for extension in (['png'] if 'png' in formats else []) + (['jpg'] if jpeg else []):
           checkpoint(cancelled)
           name=f'adapted/{stem}.{extension}'
-          adapted_image.save(temporary/name, **({'quality':95,'subsampling':0} if extension=='jpg' else {}))
+          adapted_image.save(temporary/name, dpi=dpi[::-1] if config['rotation'] in (90,270) else dpi, **({'quality':95,'subsampling':0} if extension=='jpg' else {}))
           added(name,'color' if stem=='color' else 'white')
           if pixels is not None and extension=='jpg':
             decoded=np.asarray(Image.open(temporary/name).convert('L'))
@@ -128,11 +136,18 @@ def export_bundle(snapshot, destination, *, formats=('png',), obj=False, device=
       checks.append({'code':'JPEG_ROUNDTRIP','status':'warning' if changed else 'passed','message':'JPEG 阈值轮廓或孔洞发生变化，见 jpeg-report.json' if changed else 'JPEG 阈值轮廓及孔洞回读一致；灰值误差见 jpeg-report.json'})
     if obj:
       from export_obj import export_obj
-      result = export_obj(snapshot, temporary, cancelled=cancelled, progress=progress, options=obj_options)
-      checks.extend(result.get('checks', []))
-      for name in result['files']:
-        added(name,'obj')
-    extension='jpg' if jpeg else 'png'
+      model_dir = temporary / 'model'
+      try:
+        result = export_obj(snapshot, model_dir, cancelled=cancelled, progress=progress, options=obj_options)
+        checks.extend(result.get('checks', []))
+        for name in result['files']:
+          added('model/' + name,'obj')
+      except InterruptedError:
+        raise
+      except Exception as error:
+        shutil.rmtree(model_dir, ignore_errors=True)
+        checks.append({'code':'OBJ_FAILED','status':'warning','message':f'打印文件已保留；模型失败：{error}'})
+    extension=print_format
     tasks=[dict(task,step=index+1,channel=task['role'],format=extension,
                 file=f'adapted/{task["layer"]:04d}.{extension}' if task['role']=='white' else f'adapted/color.{extension}')
            for index,task in enumerate(task_order(maximum,config))]
@@ -149,10 +164,21 @@ def export_bundle(snapshot, destination, *, formats=('png',), obj=False, device=
                 'heightCalibrationStatus':'design-unverified' if snapshot['heightMapping']['kind']=='design' else 'recorded-not-device-verified',
                 'device': profile, 'polarityVerified': profile['verified'] and
                 profile['whitePolarity'] != 'unknown', 'checks': checks,
-                'jpegDetails':reports, 'settings':config,
+                'jpegDetails':reports, 'settings':config, 'printFormat':print_format,
+                'whiteOptions':white_options, 'estimate':estimate(snapshot, config, white_options),
                 'masterWhitePolarity': 'white-is-ink', 'files': files.copy(), 'simulated': False}
+    lines = ['打印交付说明', f"尺寸：{snapshot['sizeMm'][::-1] if config['rotation'] in (90,270) else snapshot['sizeMm']} mm",
+             f"方向：先水平镜像 {config['mirror']}，再顺时针旋转 {config['rotation']}°",
+             '按以下顺序逐项打印；每行代表一次打印。project.json、height.png、coverage.png 和 model 为参考资料。',
+             '本包未针对具体 RIP 适配，请核对导入尺寸、自动白底和白墨极性。']
+    lines += [f"{t['step']:04d}  {t['file']}" for t in tasks]
+    lines += [f"检查：{c['message']}" for c in checks]
+    (temporary/'PRINT-ORDER.txt').write_text('\n'.join(lines), encoding='utf-8')
+    added('PRINT-ORDER.txt','project')
+    manifest['files'] = files.copy()
     (temporary / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     added('manifest.json','project')
+    progress(len(files), len(files), '输出完成')
     checkpoint(cancelled)
     # Windows rename 对已存在目录失败；不采用会替换目标的 replace。
     os.rename(temporary, destination)

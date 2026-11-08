@@ -140,8 +140,14 @@ def _wall(writer, normal, start, end, lo, hi, start_levels, end_levels, horizont
 
 def write_height_mesh(writer, heights, size, cancelled=lambda: False, progress=lambda *args: None):
   rows, cols = heights.shape
-  xs = [float(np.float32(size[0] * i / cols)) for i in range(cols+1)]
-  ys = [float(np.float32(size[1] * j / rows)) for j in range(rows+1)]
+  # 只有整条分界两侧高度完全相同才删除，保持阶梯边界及封闭拓扑。
+  keep_x = np.r_[0, np.flatnonzero(np.any(heights[:,1:] != heights[:,:-1], axis=0))+1, cols]
+  keep_y = np.r_[0, np.flatnonzero(np.any(heights[1:,:] != heights[:-1,:], axis=1))+1, rows]
+  original_rows, original_cols = rows, cols
+  heights = heights[np.ix_(keep_y[:-1], keep_x[:-1])]
+  rows, cols = heights.shape
+  xs = [float(np.float32(size[0] * i / original_cols)) for i in keep_x]
+  ys = [float(np.float32(size[1] * j / original_rows)) for j in keep_y]
   if not np.isfinite(xs).all() or not np.isfinite(ys).all() or not np.isfinite(heights).all():
     raise ValueError('模型尺寸超出有限浮点坐标范围')
   checkpoint(cancelled)

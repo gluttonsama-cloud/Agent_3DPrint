@@ -56,6 +56,7 @@ export default function App() {
   const task = useRef<AbortController | null>(null);
   const previewId = useRef(0);
   const [capabilityBusy, setCapabilityBusy] = useState(false);
+  const [outputResult, setOutputResult] = useState<import('./contracts').ExportResult | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [progress, setProgress] = useState<{ completed: number; total: number; message: string } | null>(null);
   const d1 = new URLSearchParams(location.search).has('d1');
@@ -348,7 +349,7 @@ export default function App() {
   }
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (busy || crop || pending || recognition || stl) return;
+      if (busy || crop || pending || recognition || stl || showExport) return;
       if (event.isComposing || isEditingTarget(event.target)) return;
       const key = event.key.toLowerCase(),
         ctrl = event.ctrlKey || event.metaKey;
@@ -467,20 +468,11 @@ export default function App() {
             保存工程
           </button>
           <button
-            disabled={!project || disabled}
-            onClick={() => {
-              setError('');
-              setStl(true);
-            }}
-          >
-            导出 STL
-          </button>
-          <button
             className="primary"
             disabled={!project || disabled}
             onClick={() => setShowExport(value => !value)}
           >
-            导出分层
+            输出与生产
           </button>
         </div>
       </header>
@@ -937,18 +929,30 @@ export default function App() {
                 onPreview={previewHeight} onRequest={request => void heightRequest(request)}
                 onCancel={() => { task.current?.abort(); previewHeight(null); }} />
             </details>
-            {showExport && <ExportPanel snapshot={snapshot} devices={[snapshot.device]} busy={capabilityBusy} progress={progress}
+            {showExport && <div className="output-workspace" role="dialog" aria-modal="true" aria-label="输出与生产" onKeyDown={event => {
+              if (event.key === 'Escape' && !capabilityBusy) { event.stopPropagation(); setShowExport(false); }
+              if (event.key === 'Tab') {
+                const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled), summary')).filter(node => node.getClientRects().length);
+                const first = controls[0], last = controls.at(-1);
+                if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+                else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+              }
+            }}><div className="output-workspace-content"><button autoFocus disabled={capabilityBusy} onClick={() => setShowExport(false)}>返回编辑</button><ExportPanel onBusy={setCapabilityBusy} onStl={() => { setShowExport(false); setStl(true); }} snapshot={snapshot} devices={[snapshot.device]} busy={capabilityBusy} progress={progress}
               onCancel={() => task.current?.abort()}
               onRequest={request => {
                 const controller = new AbortController(); task.current = controller;
                 setCapabilityBusy(true); setError(''); setProgress(null);
                 void createCapabilityService(window.reliefV2!, setProgress).export(request, controller.signal).then(result => {
                   if (result.status === 'error') setError(result.message);
-                  else setNotice(result.status === 'cancelled' ? '导出已取消' : `分层文件已导出：${result.value.outputDirectory}${result.value.checks.filter(check => check.code === 'OBJ_GEOMETRY_REPAIRED').map(check => ` · ${check.message}`).join('')}`);
+                  else if (result.status === 'cancelled') setNotice('导出已取消');
+                  else { setNotice(`打印文件已导出：${result.value.outputDirectory}`); setOutputResult(result.value); }
                 }).catch(value => setError(String(value))).finally(() => {
                   if (task.current === controller) { task.current = null; setCapabilityBusy(false); }
                 });
-              }} />}
+              }} />{outputResult && <section aria-label="交付结果"><h3>交付结果</h3><p>{outputResult.outputDirectory}</p>
+                <button onClick={() => void window.reliefV2?.openDirectory?.(outputResult.outputDirectory).catch(e => setError(String(e)))}>打开文件夹</button>
+                {outputResult.checks.map((check, i) => <p key={i}>{check.status}：{check.message}</p>)}
+              </section>}</div></div>}
           </>}
             <details className="advanced-properties">
               <summary>更多区域操作</summary>

@@ -1,6 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('reliefV2', Object.freeze({
+  production: (request) => ipcRenderer.invoke('v2:production', request),
+  chooseDirectory: () => ipcRenderer.invoke('production:directory'),
+  openDirectory: (path) => ipcRenderer.invoke('production:open-directory', path),
+  chooseProjects: () => ipcRenderer.invoke('production:projects'),
   height: (request) => ipcRenderer.invoke('v2:height', request),
   recognition: (request) => ipcRenderer.invoke('v2:recognition', request),
   export: (request) => ipcRenderer.invoke('v2:export', request),

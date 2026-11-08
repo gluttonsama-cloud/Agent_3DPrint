@@ -97,16 +97,17 @@ test('A 独立能力：真实调高、跨区擦除撤销、保存重开及 JPG/O
       expect(reopened.snapshot.heights).toEqual(snapshot.heights);
       expect(reopened.snapshot.sessionId).not.toBe(snapshot.sessionId);
     }
-    await page.getByLabel('附加 JPG', { exact: true }).check();
+    await page.getByLabel('附加 JPG 参考副本（不改变打印清单）', { exact: true }).check();
     await page.getByLabel('附加 OBJ 查看模型', { exact: true }).check();
-    await page.getByLabel('新输出目录').fill(path.join(directory, 'bundle'));
-    await page.getByRole('button', { name: '导出', exact: true }).click();
+    await page.getByLabel('输出父目录').fill(path.join(directory, 'bundle'));
+    await page.getByRole('button', { name: '生成打印交付包', exact: true }).click();
     await expect(page.getByLabel('任务状态')).toContainText('导出成功', { timeout: 30000 });
-    const files = await fs.readdir(path.join(directory, 'bundle'));
-    expect(files).toContain('manifest.json'); expect(files).toContain('relief.obj');
+    const bundle = path.join(directory, 'bundle', (await fs.readdir(path.join(directory, 'bundle')))[0]);
+    const files = await fs.readdir(bundle);
+    expect(files).toContain('manifest.json'); expect(files).toContain('model');
     await page.getByText('从输出文件独立检查 OBJ', { exact: true }).click();
     await page.getByLabel('OBJ 检查文件').setInputFiles(['relief.obj', 'relief.mtl', 'texture.png']
-      .map(name => path.join(directory, 'bundle', name)));
+      .map(name => path.join(bundle, 'model', name)));
     await expect(page.getByLabel('OBJ 尺寸')).toContainText('4.000 × 3.000 × 2.000');
     await page.screenshot({ path: path.join(directory, 'capabilities.png'), fullPage: true });
     await page.getByLabel('OBJ 检查文件').setInputFiles({ name: 'empty.obj', mimeType: 'text/plain', buffer: Buffer.from('# empty') });
