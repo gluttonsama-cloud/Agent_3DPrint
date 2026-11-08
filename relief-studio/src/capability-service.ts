@@ -8,6 +8,10 @@ interface WireRequest { requestId: string; payload: Record<string, unknown> }
 interface WireResponse { requestId: string; result: OperationResult<unknown> }
 export type Progress = { completed: number; total: number; message: string };
 export type NativeV2 = Record<Action, (request: WireRequest) => Promise<WireResponse>> & {
+  production?: (request: WireRequest) => Promise<WireResponse>;
+  chooseDirectory?: () => Promise<string | null>;
+  chooseProjects?: () => Promise<string[]>;
+  openDirectory?: (path: string) => Promise<void>;
   cancel(request: { requestId: string }): Promise<void>;
   progress(request: { requestId: string }): Promise<Progress | null>;
 };
@@ -31,7 +35,7 @@ export function decodePatch(value: unknown): EditPatch {
 }
 
 export function createCapabilityService(native: NativeV2, onProgress?: (value: Progress) => void) {
-  async function call<T>(action: Action, payload: Record<string, unknown>,
+  async function call<T>(action: Action | 'production', payload: Record<string, unknown>,
     decode: (value: unknown) => T, signal?: AbortSignal): Promise<OperationResult<T>> {
     const requestId = crypto.randomUUID();
     const snapshot = payload.snapshot as ProjectSnapshot | undefined;
@@ -45,7 +49,9 @@ export function createCapabilityService(native: NativeV2, onProgress?: (value: P
     }, 150) : undefined;
     signal?.addEventListener('abort', cancel, { once: true });
     try {
-      const response = await native[action]({ requestId, payload });
+      const invoke = native[action];
+      if (!invoke) throw new Error('当前桌面版本不支持此操作');
+      const response = await invoke({ requestId, payload });
       if (response.requestId !== requestId) throw new Error('返回任务编号不匹配');
       if (signal?.aborted && ['height', 'recognition', 'import'].includes(action))
         return { status: 'cancelled', base };
@@ -77,6 +83,7 @@ export function createCapabilityService(native: NativeV2, onProgress?: (value: P
     export: (request, signal) => call('export', input(request), value => value as ExportResult, signal),
   };
   return { ...service,
+    production: (payload: Record<string, unknown>, signal?: AbortSignal) => call('production', payload, value => value, signal),
     import: (imageDataUrl: string, sizeMm: [number, number], keepBackground = false,
       signal?: AbortSignal) => call('import', { imageDataUrl, sizeMm, keepBackground }, decodeProject, signal),
     save: (snapshot: ProjectSnapshot, path?: string) => call('save',

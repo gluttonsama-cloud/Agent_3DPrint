@@ -9,7 +9,7 @@ test('纯分色与显式主体蒙版在开发和安装版均使用 CPU，引擎�
   for (const app of [packaged, source]) {
     const command = engineCommand(app, 'source', 'resources', () => true);
     const cpu = app.isPackaged ? [path.join('resources', 'engine', 'relief-engine.exe'), []]
-      : [path.join('source', '.venv', 'Scripts', 'python.exe'), [path.join('source', 'engine', 'main.py')]];
+      : [path.join('source', '.venv', ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python'])), [path.join('source', 'engine', 'main.py')]];
     for (const payload of [{ mode: 'color' }, { mode: 'subject', subjectMask: { width: 1, height: 1 } }, { subjectMask: {} }])
       assert.deepEqual(command('recognition', payload), cpu, '显式蒙版交由 CPU 验证，不应加载 GPU');
     for (const subjectMask of [NaN, Infinity, false, [], new Date(NaN)])
@@ -31,7 +31,7 @@ test('安装版识别使用完整 GPU 运行时，编辑和导出保持 CPU 引�
     [path.join('resources', 'engine', 'relief-engine.exe'), []]);
 });
 
-test('安装版优先使用独立用户目录，重装应用不改变模型位置', () => {
+test('安装版优先使用独立用户目录，重装应用不改变模型位置', { skip: !process.env.LOCALAPPDATA }, () => {
   const app = { isPackaged: true, getPath: () => path.resolve('installed/Relief Studio.exe') };
   const persistent = path.join(process.env.LOCALAPPDATA, 'ReliefStudio', 'model-runtime', 'subject-engine.exe');
   const command = engineCommand(app, 'source', 'resources', file => file === persistent);

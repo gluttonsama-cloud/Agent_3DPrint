@@ -90,7 +90,7 @@ module.exports = function registerV2({ handle, engineCommand, chooseSave, choose
       }
     }
   }
-  for (const action of ['height', 'recognition', 'export', 'save', 'open', 'migrate', 'import'])
+  for (const action of ['height', 'recognition', 'export', 'save', 'open', 'migrate', 'import', 'production'])
     handle(`v2:${action}`, request => run(action, request), true);
   async function cancelTask({ requestId }) {
     const task = tasks.get(requestId);

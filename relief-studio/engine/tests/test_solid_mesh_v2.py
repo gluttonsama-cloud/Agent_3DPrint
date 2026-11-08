@@ -131,7 +131,7 @@ class SolidMeshTests(unittest.TestCase):
         'mode': 'solid', 'baseThicknessMm': 1, 'repairDiagonalContacts': True})
       self.assertTrue(any(check['code'] == 'OBJ_GEOMETRY_REPAIRED' for check in result['checks']))
       np.testing.assert_array_equal(np.asarray(Image.open(target/'height.png')).ravel(), source['heights'])
-      self.assertTrue(json.loads((target/'obj-meta.json').read_text('utf-8'))['closedSolid'])
+      self.assertTrue(json.loads((target/'model/obj-meta.json').read_text('utf-8'))['closedSolid'])
 
   def test_solid_cancel_and_resource_limit_leave_no_partial_files(self):
     source = snapshot([[1, 2], [1, 2]])

@@ -22,7 +22,10 @@ def execute_v2(job):
   try:
     if cancelled():
       return {'status': 'cancelled', 'base': base}
-    if action == 'open':
+    if action == 'production':
+      from production import execute
+      value = execute(payload, cancelled, progress)
+    elif action == 'open':
       value = open_project(payload['path'])
     elif action == 'import':
       from recognition_ops import import_snapshot
@@ -73,13 +76,15 @@ def execute_v2(job):
         value = export_bundle(snapshot, payload['outputDirectory'], formats=payload['formats'],
                               obj=payload.get('obj', False), device=payload.get('device'),
                               settings=payload.get('settings'), obj_options=payload.get('objOptions'),
+                              print_format=payload.get('printFormat'), white_options=payload.get('whiteOptions'),
                               cancelled=cancelled, progress=progress)
       elif action == 'save':
         value = save_project(snapshot, payload['path'])
       else:
         raise ValueError('未知 v2 操作')
     # 文件提交完成后以成功为准；不把已经提交的产物谎报为取消。
-    if cancelled() and action not in ('save', 'export'):
+    production_committed = action == 'production' and payload.get('mode') in ('batch', 'reprint', 'trial', 'model', 'record-trial')
+    if cancelled() and action not in ('save', 'export') and not production_committed:
       return {'status': 'cancelled', 'base': base}
     return {'status': 'success', 'base': base, 'value': value}
   except Exception as error:

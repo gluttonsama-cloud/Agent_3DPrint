@@ -15,7 +15,7 @@ export function StlDialog({
   onCancel(): void;
   onExport(options: StlOptions): void;
 }) {
-  const [layer, setLayer] = useState(project.heightMapping.kind === 'design' ? String(project.heightMapping.mmPerLayer) : '0.1');
+  const [layer] = useState(project.heightMapping.kind === 'design' ? String(project.heightMapping.mmPerLayer) : '0.1');
   const [base, setBase] = useState('1');
   const [repair, setRepair] = useState(false);
   const [withBase, setWithBase] = useState(true);
@@ -43,7 +43,7 @@ export function StlDialog({
           event.preventDefault();
           if (valid && !busy)
             onExport({
-              ...(calibrated ? {} : { layerHeightMm: thickness }),
+
               baseThicknessMm: bottom,
               repairDiagonalContacts: repair,
             });
@@ -81,11 +81,10 @@ export function StlDialog({
             step="any"
             required
             value={layer}
-            disabled={busy}
-            onChange={(e) => setLayer(e.target.value)}
+            readOnly
           />
         </label>
-        <small>示例值为 0.1 mm，请按需要填写；不会使用三维预览的夸张比例。</small></>}
+        <small>统一使用工程高度映射，与 OBJ 相同；修改实测高度请应用设备标定曲线。</small></>}
         <label className="base-toggle">
           <input
             type="checkbox"

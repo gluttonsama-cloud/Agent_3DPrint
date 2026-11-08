@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, session } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, session, shell } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs/promises');
 const os = require('node:os');
@@ -125,6 +125,21 @@ async function chooseSave(defaultPath, filters) {
 }
 
 function registerHandlers() {
+  handle('production:directory', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory', 'createDirectory'] });
+    return result.canceled ? null : result.filePaths[0];
+  });
+  handle('production:projects', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, { properties: ['openFile', 'multiSelections'],
+      filters: [{ name: '工程或生产记录', extensions: ['json'] }] });
+    return result.canceled ? [] : result.filePaths;
+  });
+  handle('production:open-directory', async value => {
+    if (typeof value !== 'string' || !path.isAbsolute(value) || !(await fs.stat(value)).isDirectory())
+      throw new Error('需要有效的本地目录');
+    const error = await shell.openPath(value);
+    if (error) throw new Error(error);
+  });
   v2Runtime = require('./v2.cjs')({ handle, engineCommand, chooseSave,
     prepareEngine: async action => {
       if (!['import', 'recognition'].includes(action)) return;

@@ -141,11 +141,11 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
     await app.evaluate(({ dialog }, directory) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [directory] });
     }, output);
-    await page.getByRole('button', { name: '导出分层' }).click();
-    await page.getByLabel('新输出目录').fill(path.join(output, 'relief-v2'));
-    await page.getByRole('button', { name: '导出', exact: true }).click();
-    await expect(page.locator('.statusbar')).toContainText('分层文件已导出');
-    const dir = (await fs.readdir(output)).find((name) => name.startsWith('relief-'))!;
+    await page.getByRole('button', { name: '输出与生产' }).click();
+    await page.getByLabel('输出父目录').fill(path.join(output, 'relief-v2'));
+    await page.getByRole('button', { name: '生成打印交付包', exact: true }).click();
+    await expect(page.locator('.statusbar')).toContainText('打印文件已导出');
+    const dir = path.join('relief-v2', (await fs.readdir(path.join(output, 'relief-v2')))[0]);
     const exported = decodeProject(JSON.parse(await fs.readFile(path.join(output, dir, 'project.json'), 'utf8')));
     expect(Array.from(exported.labels)).toEqual(kept.labels);
     expect(exported.heights).toEqual(kept.heights);
@@ -153,11 +153,12 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
     await app.evaluate(({ dialog }, file) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
     }, stlPath);
-    await page.getByRole('button', { name: '导出 STL', exact: true }).click();
+    if (!await page.getByRole('button', { name: '实体模型 STL…', exact: true }).isVisible())
+      await page.getByRole('button', { name: '输出与生产', exact: true }).click();
+    await page.getByRole('button', { name: '实体模型 STL…', exact: true }).click();
     const stl = page.getByRole('dialog', { name: '导出 STL', exact: true });
-    await stl.getByLabel('STL 每层厚度').fill('0');
-    await expect(stl.getByRole('button', { name: '选择位置并导出' })).toBeDisabled();
-    await stl.getByLabel('STL 每层厚度').fill('0.2');
+    await expect(stl.getByLabel('STL 每层厚度')).toHaveValue('0.1');
+    await expect(stl.getByLabel('STL 每层厚度')).toHaveAttribute('readonly', '');
     await stl.getByLabel('STL 底板厚度').fill('1.5');
     await stl.getByRole('button', { name: '选择位置并导出' }).click();
     await expect(page.locator('.statusbar')).toContainText('STL 已导出', { timeout: 30000 });
@@ -172,7 +173,7 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
             maxima[axis],
             binary.readFloatLE(84 + i * 50 + 12 + vertex * 12 + axis * 4),
           );
-    expect(maxima).toEqual([50, 40, 3.5]);
+    expect(maxima).toEqual([50, 40, 2.5]);
     await page.setViewportSize({ width: 1100, height: 720 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
@@ -199,7 +200,9 @@ test('智能点选、圈选、清除保留、保存重开、分层和 STL 导出
     await page.mouse.up();
     await expect(page.getByTestId('selection-count')).toHaveAttribute('data-count', '3');
     await fs.writeFile(stlPath, 'previous model');
-    await page.getByRole('button', { name: '导出 STL', exact: true }).click();
+    if (!await page.getByRole('button', { name: '实体模型 STL…', exact: true }).isVisible())
+      await page.getByRole('button', { name: '输出与生产', exact: true }).click();
+    await page.getByRole('button', { name: '实体模型 STL…', exact: true }).click();
     await stl.getByRole('button', { name: '选择位置并导出' }).click();
     await expect(stl.getByRole('alert')).toContainText('对角接触', { timeout: 30000 });
     expect(await fs.readFile(stlPath, 'utf8')).toBe('previous model');

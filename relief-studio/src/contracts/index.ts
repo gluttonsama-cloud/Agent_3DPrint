@@ -93,10 +93,15 @@ export interface ExportRequest {
   snapshot: ProjectSnapshot;
   device: DeviceProfile;
   formats: ('png' | 'jpg')[];
+  printFormat?: 'png' | 'jpg';
+  whiteOptions?: WhiteOptions;
   obj: boolean;
   objOptions?: ObjExportOptions;
   outputDirectory: string;
   settings?: OutputSettings; // 独立打印适配，不改变工程几何高度
+}
+export interface WhiteOptions {
+  mode: 'solid' | 'alpha' | 'threshold'; threshold: number; insetMm: number; offsetXmm: number; offsetYmm: number;
 }
 export interface OutputSettings {
   mirror: boolean;

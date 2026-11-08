@@ -26,7 +26,7 @@ module.exports = (app, root, resources, exists = fs.existsSync) => (action, payl
   }
   return app.isPackaged
     ? [path.join(resources, 'engine', 'relief-engine.exe'), []]
-    : [path.join(root, '.venv', 'Scripts', 'python.exe'), [path.join(root, 'engine', 'main.py')]];
+    : [path.join(root, '.venv', ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python'])), [path.join(root, 'engine', 'main.py')]];
 };
 
 module.exports.requiresGpu = requiresGpu;
